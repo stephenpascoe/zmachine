@@ -6,7 +6,8 @@ module Lib
     ( parseHeader
     , open
     , Header(..)
-    , parseZchars
+    -- , parseZchars
+    , showHeader
     ) where
 
 import qualified Data.ByteString.Lazy as BL
@@ -15,8 +16,13 @@ import Data.Word
 import Data.Int
 import Data.Bits
 import Data.List
-import qualified Data.Text as T
+import Data.Monoid
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Builder as TB
 import qualified Data.Char as C
+import qualified Formatting as F
+import Formatting ((%), (%.))
+
 
 type ByteAddress = Word16
 type Colour = Word8
@@ -35,7 +41,7 @@ data Header = Header { version :: Int8
                      , baseStaticMemory :: ByteAddress
                      , flags2 :: Flags2   -- Mutable
                      , abbreviationsTable :: ByteAddress
-                     , fileLength :: Int16
+                     , fileLength :: Word32
                      , checksum :: Word16
                      , interpreterNumber :: Int8
                      , interpreterVersion :: Int8
@@ -97,8 +103,9 @@ parseHeader = do
   variablesTable <- getWord16be
   baseStaticMemory <- getWord16be
   flags2 <- getWord8
+  skip 7
   abbreviationsTable <- getWord16be
-  fileLength <- getInt16be
+  rawFileLength <- getWord16be
   checksum <- getWord16be
   interpreterNumber <- getInt8
   interpreterVersion <- getInt8
@@ -107,6 +114,12 @@ parseHeader = do
   routinesOffset <- getWord16be
   staticStringsOffset <- getWord16be
   -- TODO Rest of header
+
+  let fileLength = scale (fromIntegral rawFileLength) where
+        scale :: Word32 -> Word32
+        scale x | version < 4 = x * 2
+        scale x | version < 6 = x * 4
+        scale x = x * 8
 
   return defaultHeader { version
                        , flags1
@@ -131,8 +144,32 @@ open path = do
   return $ runGet parseHeader storyFile
 
 
+showHeader :: Header -> TL.Text
+showHeader header = TB.toLazyText $ mconcat [ bprint "Z-code version" version F.int
+                                            , bprint "Interpreter flags" flags1 F.int
+                                            -- TODO : release number
+                                            , bprint "Size of resident memory" baseHighMemory F.hex
+                                            , bprint "Start PC" initPC F.hex
+                                            , bprint "Dictionary address" dictionary F.hex
+                                            , bprint "Object table address" objectTable F.hex
+                                            , bprint "Global variables address" variablesTable F.hex
+                                            , bprint "Size of dynamic memory" baseStaticMemory F.hex
+                                            , bprint "Game flags" flags2 F.int
+                                            -- TODO : serial number
+                                            , bprint "Abbreviations address" abbreviationsTable F.hex
+                                            , bprint "File size" fileLength F.hex
+                                            -- TODO : Checksum
+                                            , bprint "Checksum" checksum F.hex
+                                            -- TODO : Terminating keys
+                                            -- TODO : Header extension
+                                            , bprint "Inform Version" interpreterNumber F.int
+                                            ]
+  where
+    field typ = (F.right 26 ' ' %. F.text % ": ") % typ % "\n"
+    bprint fieldName accessor fieldType   = F.bprint (field fieldType) fieldName (accessor header)
 
 
+{-
 --
 -- ZSCII handling
 --
@@ -209,3 +246,4 @@ unpackZchars w = (z1, z2, z3) where
   z1 = fromIntegral $ (w' `shift` (-10)) .&. mask
   z2 = fromIntegral $ (w' `shift`  (-5)) .&. mask
   z3 = fromIntegral $ w' .&. mask
+-}
