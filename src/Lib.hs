@@ -6,7 +6,6 @@ module Lib
     ( parseHeader
     , open
     , Header(..)
-    -- , parseZchars
     , showHeader
     ) where
 
@@ -215,83 +214,3 @@ showHeader header = TB.toLazyText $ mconcat [ bprint "Z-code version" version F.
   where
     field typ = (F.right 26 ' ' %. F.text % ": ") % typ % "\n"
     bprint fieldName accessor fieldType   = F.bprint (field fieldType) fieldName (accessor header)
-
-
-{-
---
--- ZSCII handling
---
-
-type Zchar = Word8
-type ZSCII = C.Char
-
-data CurrentAlphabet = A0 | A1 | A2 deriving Eq
-
-data Alphabet = Alphabet { alpha0 :: T.Text
-                         , alpha1 :: T.Text
-                         , alpha2 :: T.Text
-                         }
-
-alphabetV1 :: Alphabet
-alphabetV1 = Alphabet { alpha0 = "abcdefghijklmnopqrstuvwxyz"
-                      , alpha1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                      , alpha2 = " 0123456789.,!?_#'\"/\\<-:()"
-                      }
-
-alphabetV2 :: Alphabet
-alphabetV2 = Alphabet { alpha0 = "abcdefghijklmnopqrstuvwxyz"
-                      , alpha1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                      , alpha2 = " ^0123456789.,!?_#'\"/\\-:()"
-                      }
-
--- TODO : Version 5 supports an alphabet table in the file.  This is assumed to be absent.
-
-data DecodeState = DecodeState { alphabet :: Alphabet
-                               , currentAlphabet :: CurrentAlphabet
-                               , lockAlphabet :: CurrentAlphabet
-                               , decoded :: [ZSCII]
-                               }
-
-decodeZchar :: DecodeState -> Zchar -> DecodeState
-decodeZchar state c = if c < 6 then shift else lookup where
-  shift = case c of
-            -- TODO : c == 1 or 0
-            2 -> state { shiftMode = Shift2, alphabet = cycle2 (alphabet state) }
-            3 -> state { shiftMode = Shift3, alphabet = cycle3 (alphabet state) }
-            -- TODO
-  unshift = undefined
-  lookup = unshift $ case currentAlphabet state of
-                       A0 -> state { decoded = (getChar alpha0:decoded state)
-                                   }
-                       A1 -> state { decoded = (getChar alpha1:decoded state)
-                                   }
-                       A2 -> state { decoded = (getChar alpha2:decoded state)
-                                   }
-  getChar f = T.index (f (alphabet state)) (fromIntegral c)
-  cycle2 alpha = head . tail . dropWhile (/= alpha) $ cycle [A0, A1, A2]
-  cycle3 alpha = head . tail . tail . dropWhile (/= alpha) $ cycle [A0, A1, A2]
-  uncycle2 alpha = head . tail . dropWhile (/= alpha) $ cycle [A2, A1, A0]
-  uncycle3 alpha = head . tail . tail . dropWhile (/= alpha) $ cycle [A2, A1, A0]
-
-parseZchars :: Get [Zchar]
-parseZchars = do
-  empty <- isEmpty
-  if empty
-    then return []
-    else do w <- getWord16be
-            let (z1, z2, z3) = unpackZchars w
-            -- End of Z-string
-            if (w .&. 0x8000) == 0x8000
-              then return [z1,z2,z3]
-              else do zchars <- parseZchars
-                      return (z1:z2:z3:zchars)
-
-
-unpackZchars :: Word16 -> (Zchar, Zchar, Zchar)
-unpackZchars w = (z1, z2, z3) where
-  mask = 0x001f
-  w' = w `xor` 0x8000
-  z1 = fromIntegral $ (w' `shift` (-10)) .&. mask
-  z2 = fromIntegral $ (w' `shift`  (-5)) .&. mask
-  z3 = fromIntegral $ w' .&. mask
--}
