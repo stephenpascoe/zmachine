@@ -65,39 +65,6 @@ data Header = Header { version :: Int8
                      , extensionTable :: ByteAddress
                      } deriving Show
 
-defaultHeader = Header { version = 0
-                       , flags1 = 0
-                       , releaseNumber = 0
-                       , baseHighMemory = 0
-                       , initPC = 0
-                       , dictionary = 0
-                       , objectTable = 0
-                       , variablesTable = 0
-                       , baseStaticMemory = 0
-                       , flags2 = 0
-                       , serialCode = ""
-                       , abbreviationsTable = 0
-                       , fileLength = 0
-                       , checksum = 0
-                       , interpreterNumber = 0
-                       , interpreterVersion = 0
-                       , screenHeightLines = 0
-                       , screenWidthChars = 0
-                       , screenWidth = 0
-                       , screenHeight = 0
-                       , fontWidth = 0
-                       , fontHeight = 0
-                       , routinesOffset = 0
-                       , staticStringsOffset = 0
-                       , backgroundColour = 0
-                       , foregroundColour = 0
-                       , endCharacterTable = 0
-                       , stream3OutputPixels = 0
-                       , revisionNumber = 0
-                       , alphabetTable = 0
-                       , extensionTable = 0
-                       }
-
 
 parseHeader :: Get Header
 parseHeader = do
@@ -151,39 +118,7 @@ parseHeader = do
         scale x | version < 6 = x * 4
         scale x = x * 8
 
-  return defaultHeader { version
-                       , flags1
-                       , releaseNumber
-                       , baseHighMemory
-                       , initPC
-                       , dictionary
-                       , objectTable
-                       , variablesTable
-                       , baseStaticMemory
-                       , flags2
-                       , serialCode
-                       , abbreviationsTable
-                       , fileLength
-                       , checksum
-                       , interpreterNumber
-                       , interpreterVersion
-                       , screenHeightLines
-                       , screenWidthChars
-                       , screenWidth
-                       , screenHeight
-                       , fontWidth
-                       , fontHeight
-                       , routinesOffset
-                       , staticStringsOffset
-                       , backgroundColour
-                       , foregroundColour
-                       , endCharacterTable
-                       , stream3OutputPixels
-                       , revisionNumber
-                       , alphabetTable
-                       , extensionTable
-                       }
-
+  return $ Header { .. }
 
 open :: FilePath -> IO Header
 open path = do
