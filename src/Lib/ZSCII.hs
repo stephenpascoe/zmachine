@@ -9,6 +9,9 @@ import Data.Char
 import Data.Word
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
+import Data.Binary.Get
+import Data.Bits
+
 
 -- | Characters
 type ZSCII = Char
@@ -45,7 +48,7 @@ alphabetV2 = AlphabetTable { alpha0 = "abcdefghijklmnopqrstuvwxyz"
                            , alpha2 = "^\n0123456789.,!?_#'\"/\\-:()"
                            }
 
--- TODO : typesave version
+-- TODO : typesafe version
 getAlphabetTable :: Version -> Alphabet -> T.Text
 getAlphabetTable 1 Alpha0 = alpha0 alphabetV1
 getAlphabetTable 1 Alpha1 = alpha1 alphabetV1
@@ -104,13 +107,13 @@ byteToAbrev = undefined
 
 
 
-{-
 --
--- ZSCII handling
+-- Decoding ByteStrings to ZChars
 --
 
-
-parseZchars :: Get [Zchar]
+-- TODO : Optional stop conditions: end of string, fixed length or until ByteString exausted
+-- | Parse a ByteString to a stream of ZChars
+parseZchars :: Get [ZChar]
 parseZchars = do
   empty <- isEmpty
   if empty
@@ -124,11 +127,10 @@ parseZchars = do
                       return (z1:z2:z3:zchars)
 
 
-unpackZchars :: Word16 -> (Zchar, Zchar, Zchar)
+unpackZchars :: Word16 -> (ZChar, ZChar, ZChar)
 unpackZchars w = (z1, z2, z3) where
   mask = 0x001f
   w' = w `xor` 0x8000
   z1 = fromIntegral $ (w' `shift` (-10)) .&. mask
   z2 = fromIntegral $ (w' `shift`  (-5)) .&. mask
   z3 = fromIntegral $ w' .&. mask
--}
