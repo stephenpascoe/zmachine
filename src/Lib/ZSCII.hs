@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Lib.ZSCII (
+module Lib.ZSCII ( parse
+                 ,
                  )
 
 where
@@ -8,10 +9,13 @@ where
 import Data.Char
 import Data.Word
 import qualified Data.ByteString.Char8 as B
-import qualified Data.Text as T
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.Text.Lazy as T
+import qualified Data.Text.Lazy.Builder as TB
+import Data.Monoid
 import Data.Binary.Get
 import Data.Bits
-
+import Data.List
 
 -- | Characters
 type ZSCII = Char
@@ -23,87 +27,100 @@ newtype ZString = ZString B.ByteString
 
 data Alphabet = Alpha0 | Alpha1 | Alpha2
 
--- | Alphabet represents characters from value 6 onwards
-data AlphabetTable = AlphabetTable { alpha0 :: T.Text
-                                   , alpha1 :: T.Text
-                                   , alpha2 :: T.Text
-                                   }
+-- | ZCharEvent models the interpretation of each ZChar in a ZChar stream.
+data ZCharEvent = ShiftUpEvent Bool
+                | ShiftDownEvent Bool
+                | Abrev1Event
+                | Abrev2Event
+                | Abrev3Event
+                | ZSCIIEvent ZSCII
 
-data AlphabetTableState = ShiftState Alphabet
-                        | ShiftLockState Alphabet
-                        | Abrev1State
-                        | Abrev2State
-                        | Abrev3State
-                        | ZSCIIState ZSCII
+-- | ZCharState models the state machine used for converting ZCars to ZSCII
 
-alphabetV1 :: AlphabetTable
-alphabetV1 = AlphabetTable { alpha0 = "abcdefghijklmnopqrstuvwxyz"
-                           , alpha1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                           , alpha2 = "^0123456789.,!?_#'\"/\\<-:()"
-                           }
+data AbrevState = NoAbrevState | Abrev1State | Abrev2State | Abrev3State
+data ParseState = ParseState { currentVersion :: Int
+                             , currentAlphabet :: Alphabet
+                             , nextCharAlphabet :: Maybe Alphabet
+                             , abrevState :: AbrevState
+                             , parsedChars :: TB.Builder
+                             }
 
-alphabetV2 :: AlphabetTable
-alphabetV2 = AlphabetTable { alpha0 = "abcdefghijklmnopqrstuvwxyz"
-                           , alpha1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                           , alpha2 = "^\n0123456789.,!?_#'\"/\\-:()"
-                           }
 
--- TODO : typesafe version
+shiftUp Alpha0 = Alpha1
+shiftUp Alpha1 = Alpha2
+shiftUp Alpha2 = Alpha0
+shiftDown Alpha0 = Alpha2
+shiftDown Alpha1 = Alpha0
+shiftDown Alpha2 = Alpha1
+
+parse :: Version -> ZString -> T.Text
+parse version (ZString str) = TB.toLazyText . parsedChars $ state where
+  init = ParseState { currentVersion = version
+                    , currentAlphabet = Alpha0
+                    , abrevState = NoAbrevState
+                    , nextCharAlphabet = Nothing
+                    , parsedChars = mempty
+                    }
+  state = foldl' consumeByte init $ runGet parseZchars (BL.fromStrict str)
+
+
+consumeByte :: ParseState -> ZChar -> ParseState
+consumeByte state char =
+  let
+    alpha = currentAlphabet state
+    shift shiftF lock = state { currentAlphabet = shiftF alpha
+                              , nextCharAlphabet = if lock then Nothing else Just alpha
+                              }
+  in
+    case byteToEvent (currentVersion state) alpha char of
+      ZSCIIEvent z -> state { parsedChars = TB.singleton z <> parsedChars state
+                            , currentAlphabet = case nextCharAlphabet state of
+                                                  Nothing -> alpha
+                                                  Just a -> a
+                            , nextCharAlphabet = Nothing
+                            }
+      ShiftUpEvent lock -> shift shiftUp lock
+      ShiftDownEvent lock -> shift shiftDown lock
+
+      Abrev1Event -> undefined
+      Abrev2Event -> undefined
+      Abrev3Event -> undefined
+
+
+
 getAlphabetTable :: Version -> Alphabet -> T.Text
-getAlphabetTable 1 Alpha0 = alpha0 alphabetV1
-getAlphabetTable 1 Alpha1 = alpha1 alphabetV1
-getAlphabetTable 1 Alpha2 = alpha2 alphabetV1
-getAlphabetTable _ Alpha0 = alpha0 alphabetV2
-getAlphabetTable _ Alpha1 = alpha1 alphabetV2
-getAlphabetTable _ Alpha2 = alpha2 alphabetV2
+getAlphabetTable 1 Alpha0 = "abcdefghijklmnopqrstuvwxyz"
+getAlphabetTable 1 Alpha1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+getAlphabetTable 1 Alpha2 = "^0123456789.,!?_#'\"/\\<-:()"
+getAlphabetTable _ Alpha0 = "abcdefghijklmnopqrstuvwxyz"
+getAlphabetTable _ Alpha1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+getAlphabetTable _ Alpha2 = "^\n0123456789.,!?_#'\"/\\-:()"
 
-byteToState :: Version -> Alphabet -> ZChar -> AlphabetTableState
-byteToState version alphabet char
-  | char < 6 = byteToState' version alphabet char
-byteToState version alphabet char
+byteToEvent :: Version -> Alphabet -> ZChar -> ZCharEvent
+byteToEvent version _ char
+  | char < 6 = byteToEvent' version char
+byteToEvent version alphabet char
   | char < 32 = let txt = getAlphabetTable version alphabet
-                in  ZSCIIState $ T.index txt (fromIntegral char)
+                in  ZSCIIEvent $ T.index txt (fromIntegral char)
 
+byteToEvent' :: Version -> ZChar -> ZCharEvent
+byteToEvent' _ 0 = ZSCIIEvent ' '
+byteToEvent' 1 1 = ZSCIIEvent '\n'
+byteToEvent' 2 1 = Abrev1Event
+byteToEvent' version char | version < 3 = case char of
+                                            2 -> ShiftUpEvent False
+                                            3 -> ShiftDownEvent False
+                                            4 -> ShiftDownEvent True
+                                            5 -> ShiftDownEvent True
+byteToEvent' version char = if (char == 4) || (char == 5)
+                            then case char of
+                                   4 -> ShiftUpEvent False
+                                   5 -> ShiftDownEvent False
+                            else case char of
+                                   1 -> Abrev1Event
+                                   2 -> Abrev2Event
+                                   3 -> Abrev3Event
 
-byteToState' :: Version -> Alphabet -> ZChar -> AlphabetTableState
-byteToState' _ _ 0 = ZSCIIState ' '
-byteToState' 1 _ 1 = ZSCIIState '\n'
-byteToState' 2 _ 1 = undefined -- TODO : What is this?
-byteToState' version alphabet char
-  | version < 3 = byteToShiftStateV12 alphabet char
-byteToState' version alphabet char = byteToStateV3 version alphabet char
-
-
-byteToShiftStateV12 :: Alphabet -> ZChar -> AlphabetTableState
-byteToShiftStateV12 Alpha0 2 = ShiftState Alpha1
-byteToShiftStateV12 Alpha1 2 = ShiftState Alpha2
-byteToShiftStateV12 Alpha2 2 = ShiftState Alpha0
-byteToShiftStateV12 Alpha0 3 = ShiftState Alpha2
-byteToShiftStateV12 Alpha1 3 = ShiftState Alpha0
-byteToShiftStateV12 Alpha2 3 = ShiftState Alpha1
-byteToShiftStateV12 Alpha0 4 = ShiftLockState Alpha1
-byteToShiftStateV12 Alpha1 4 = ShiftLockState Alpha2
-byteToShiftStateV12 Alpha2 4 = ShiftLockState Alpha0
-byteToShiftStateV12 Alpha0 5 = ShiftLockState Alpha2
-byteToShiftStateV12 Alpha1 5 = ShiftLockState Alpha0
-byteToShiftStateV12 Alpha2 5 = ShiftLockState Alpha1
-
-byteToStateV3 :: Version -> Alphabet -> ZChar -> AlphabetTableState
-byteToStateV3 _ alphabet char
-  | (char == 4) || (char == 5) = byteToShiftStateV3 alphabet char
-byetToStateV3 = byteToAbrev
-
-byteToShiftStateV3 :: Alphabet -> ZChar -> AlphabetTableState
-byteToShiftStateV3 Alpha0 4 = ShiftState Alpha1
-byteToShiftStateV3 Alpha1 4 = ShiftState Alpha2
-byteToShiftStateV3 Alpha2 4 = ShiftState Alpha0
-byteToShiftStateV3 Alpha0 5 = ShiftState Alpha2
-byteToShiftStateV3 Alpha1 5 = ShiftState Alpha0
-byteToShiftStateV3 Alpha2 5 = ShiftState Alpha1
-
--- TODO : byteToAbrev
-byteToAbrev :: Version -> Alphabet -> ZChar -> AlphabetTableState
-byteToAbrev = undefined
 
 
 
