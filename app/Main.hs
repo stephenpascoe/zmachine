@@ -1,6 +1,6 @@
 module Main where
 
-import Lib
+import qualified Lib.Memory as M
 import qualified Data.ByteString.Lazy as BL
 import System.Environment (getArgs)
 import Data.Binary.Get (runGet)
@@ -10,7 +10,5 @@ main :: IO ()
 main = do
   args <- getArgs
   let storyFile = head args
-  storyData <- BL.readFile storyFile
-  let header = runGet parseHeader storyData
-  -- putStrLn $ show header
-  TIO.putStrLn $ showHeader header
+  storyH <- M.new storyFile
+  TIO.putStrLn $ M.showHeader (M.getHeader storyH)

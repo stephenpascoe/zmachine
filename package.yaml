@@ -27,7 +27,6 @@ dependencies:
 - vector
 - formatting
 
-
 library:
   source-dirs: src
 

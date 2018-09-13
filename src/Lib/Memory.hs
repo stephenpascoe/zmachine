@@ -1,28 +1,37 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Lib
-    ( parseHeader
-    , open
-    , Header(..)
-    , showHeader
-    ) where
+module Lib.Memory
+  ( Handle
+  , Header
+  , new
+  , close
+  , getHeader
+  , getStoryBytes
+  , showHeader
+  ) where
 
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Char8 as B
-import Data.Binary.Get
-import Data.Word
-import Data.Int
-import Data.Bits
-import Data.List
-import Data.Monoid
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Builder as TB
 import qualified Data.Text.Encoding as TE
 import qualified Data.Char as C
 import qualified Formatting as F
 import Formatting ((%), (%.))
+import Data.Binary.Get
+import Data.Word
+import Data.Int
+import Data.Bits
+import Data.List
+import Data.Monoid
+
+
+-- TODO : Newtupe deriving
+-- newtype ZMem a = ZMem (ReaderT B.ByteString IO a) deriving (Functor, Monad, Applicative, MonadReader B.ByteString)
+newtype Handle = Handle { storyBytes :: B.ByteString }
 
 
 type ByteAddress = Word16
@@ -65,6 +74,23 @@ data Header = Header { version :: Int8
                      , extensionTable :: ByteAddress
                      } deriving Show
 
+
+
+new :: FilePath -> IO Handle
+new path = do file <- BL.readFile path
+              return $ Handle (BL.toStrict file)
+
+close :: Handle -> IO ()
+close _ = return ()
+
+getStoryBytes :: Handle
+         -> Int -- ^ Offset
+         -> Int -- ^ Length
+         -> B.ByteString
+getStoryBytes h offset length = B.take length $ B.drop offset (storyBytes h)
+
+getHeader :: Handle -> Header
+getHeader h = runGet parseHeader (BL.fromStrict $ storyBytes h)
 
 parseHeader :: Get Header
 parseHeader = do
@@ -119,12 +145,6 @@ parseHeader = do
         scale x = x * 8
 
   return $ Header { .. }
-
-open :: FilePath -> IO Header
-open path = do
-  storyFile <- BL.readFile path
-  return $ runGet parseHeader storyFile
-
 
 showHeader :: Header -> TL.Text
 showHeader header = TB.toLazyText $ mconcat [ bprint "Z-code version" version F.int
