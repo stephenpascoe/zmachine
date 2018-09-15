@@ -29,6 +29,7 @@ dependencies:
 - pretty-hex
 - hspec
 - QuickCheck
+- quickcheck-instances
 
 library:
   source-dirs: src

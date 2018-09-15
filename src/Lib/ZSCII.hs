@@ -21,6 +21,7 @@ import Data.Monoid
 import Data.Binary.Get
 import Data.Bits
 import Data.List
+import Data.Int
 
 
 -- TODO : ZSCII strings should probably be based on ByteString not Text.  Need final conversion
@@ -29,7 +30,7 @@ import Data.List
 -- | Characters
 type ZSCII = Word8
 type ZChar = Word8
-type Version = Int
+type Version = Int8
 
 -- | A ByteString representing ZString encoded characters
 newtype ZString = ZString B.ByteString deriving Show
@@ -49,7 +50,7 @@ data ZCharEvent = ShiftUpEvent Bool
 -- | ZCharState models the state machine used for converting ZCars to ZSCII
 
 data AbrevState = NoAbrevState | Abrev1State | Abrev2State | Abrev3State
-data ParseState = ParseState { currentVersion :: Int
+data ParseState = ParseState { currentVersion :: Version
                              , currentAlphabet :: Alphabet
                              , nextCharAlphabet :: Maybe Alphabet
                              , abrevState :: AbrevState
@@ -85,7 +86,7 @@ consumeByte state char =
                               }
   in
     case byteToEvent (currentVersion state) alpha char of
-      ZSCIIEvent z -> state { parsedChars = BB.word8 z <> parsedChars state
+      ZSCIIEvent z -> state { parsedChars = parsedChars state <> BB.word8 z
                             , currentAlphabet = case nextCharAlphabet state of
                                                   Nothing -> alpha
                                                   Just a -> a
@@ -113,7 +114,7 @@ byteToEvent version _ char
   | char < 6 = byteToEvent' version char
 byteToEvent version alphabet char
   | char < 32 = let ZSeq txt = getAlphabetTable version alphabet
-                in  ZSCIIEvent $ B.index txt (fromIntegral char)
+                in  ZSCIIEvent $ B.index txt (fromIntegral (char - 6))
 
 byteToEvent' :: Version -> ZChar -> ZCharEvent
 byteToEvent' _ 0 = ZSCIIEvent $ (toEnum . fromEnum) ' '
