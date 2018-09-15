@@ -26,6 +26,9 @@ dependencies:
 - text
 - vector
 - formatting
+- pretty-hex
+- hspec
+- QuickCheck
 
 library:
   source-dirs: src

@@ -5,11 +5,12 @@
 
 module Lib.Memory
   ( Handle
-  , Header
+  , Header(..)
   , new
   , close
   , getHeader
   , getStoryBytes
+  , streamStoryBytes
   , showHeader
   ) where
 
@@ -88,6 +89,11 @@ getStoryBytes :: Handle
          -> Int -- ^ Length
          -> B.ByteString
 getStoryBytes h offset length = B.take length $ B.drop offset (storyBytes h)
+
+streamStoryBytes :: Handle
+               -> Int -- ^ Offset
+               -> BL.ByteString
+streamStoryBytes h offset = BL.fromStrict $ B.drop offset (storyBytes h)
 
 getHeader :: Handle -> Header
 getHeader h = runGet parseHeader (BL.fromStrict $ storyBytes h)

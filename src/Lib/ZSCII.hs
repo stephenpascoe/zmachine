@@ -6,6 +6,7 @@ module Lib.ZSCII ( decode
                  , ZSCII
                  , Version
                  -- For debugging
+                 , ZChar
                  , packZchars
                  , unpackZchars
                  )
@@ -64,15 +65,15 @@ shiftDown Alpha1 = Alpha0
 shiftDown Alpha2 = Alpha1
 
 
-decode :: Version -> Maybe Int -> ZString -> ZSeq
-decode version mLength (ZString str) = ZSeq $ BL.toStrict . BB.toLazyByteString . parsedChars $ state where
+decode :: Version -> ZString -> ZSeq
+decode version (ZString str) = ZSeq $ BL.toStrict . BB.toLazyByteString . parsedChars $ state where
   init = ParseState { currentVersion = version
                     , currentAlphabet = Alpha0
                     , abrevState = NoAbrevState
                     , nextCharAlphabet = Nothing
                     , parsedChars = mempty
                     }
-  state = foldl' consumeByte init $ runGet (decodeZchars mLength) (BL.fromStrict str)
+  state = foldl' consumeByte init $ runGet decodeZchars (BL.fromStrict str)
 
 
 consumeByte :: ParseState -> ZChar -> ParseState
@@ -142,28 +143,19 @@ byteToEvent' version char = if (char == 4) || (char == 5)
 
 -- | Parse a ByteString to a stream of ZChars
 --   If mLength is provided parses that number of bytes, otherwise parse until stop bit is set.
-decodeZchars :: Maybe Int -> Get [ZChar]
-decodeZchars mLength = do
+decodeZchars :: Get [ZChar]
+decodeZchars = do
   empty <- isEmpty
-  if empty
-    then return []
+  if empty then return []
     else do w <- getWord16be
+            zchars <- decodeZchars
             let (z1, z2, z3) = unpackZchars w
-            case mLength of
-              Nothing -> if (w .&. 0x8000) == 0x8000 then
-                           return [z1,z2,z3]
-                         else do zchars <- decodeZchars Nothing
-                                 return (z1:z2:z3:zchars)
-              Just length -> if length <= 1 then
-                               return [z1, z2, z3]
-                             else do zchars <- decodeZchars (Just (length - 2))
-                                     return (z1:z2:z3:zchars)
-
+            return (z1:z2:z3:zchars)
 
 unpackZchars :: Word16 -> (ZChar, ZChar, ZChar)
 unpackZchars w = (z1, z2, z3) where
   mask = 0x001f
-  w' = w `xor` 0x8000
+  w' = w .&. 0x7fff
   z1 = fromIntegral $ (w' `shift` (-10)) .&. mask
   z2 = fromIntegral $ (w' `shift`  (-5)) .&. mask
   z3 = fromIntegral $ w' .&. mask
