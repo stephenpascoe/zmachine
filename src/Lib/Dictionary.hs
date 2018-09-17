@@ -55,18 +55,15 @@ decodeDictionaryHeader = do n <- getWord8
                                                       , numEntries = fromIntegral numEntries
                                                       }
 
-decodeWordEntry :: Z.Version -> DictionaryHeader -> Get Z.ZSeq
-decodeWordEntry version header = do
-  let byteLength = ceiling $ fromIntegral (entryLength header) * 2 / 3
-  bytes <- getByteString byteLength
-  return $ Z.decode version (Z.ZString bytes)
-
 
 -- TODO : use higher-order function instead of recursion
 decodeWordEntries :: Z.Version -> DictionaryHeader -> Get [Z.ZSeq]
 decodeWordEntries v h = let nmax = numEntries h
+                            zlen = if v < 4 then 4 else 6
                             f n | n >= nmax = return []
-                            f n = do entry <- decodeWordEntry v h
+                            f n = do zstr <- Z.ZString <$> getByteString zlen
+                                     let entry = Z.decode v zstr
+                                     skip $ (entryLength h) - zlen
                                      rest <- f (n+1)
                                      return $ entry:rest
                         in f 0
