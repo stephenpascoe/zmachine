@@ -1,19 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Lib.ZSCII ( decode
-                 , ZString(..)
-                 , ZSeq(..)
-                 , ZSCII
-                 , Version
-                 , zseqToText
-                 -- For debugging
-                 , ZChar
-                 , packZchars
-                 , unpackZchars
-                 )
-where
+module Language.ZMachine.ZSCII
+  ( decode
+  , ZString(..)
+  , ZSeq(..)
+  , ZSCII
+  , Version
+  , zseqToText
+  -- For debugging
+  , ZChar
+  , packZchars
+  , unpackZchars
+  ) where
 
-import Data.Char
 import Data.Word
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL

@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Lib.Memory
+module Language.ZMachine.Memory
   ( Handle
   , Header(..)
   , new
@@ -19,19 +19,13 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Builder as TB
 import qualified Data.Text.Encoding as TE
-import qualified Data.Char as C
 import qualified Formatting as F
 import Formatting ((%), (%.))
 import Data.Binary.Get
 import Data.Word
 import Data.Int
-import Data.Bits
-import Data.List
-import Data.Monoid
 
 
--- TODO : Newtupe deriving
--- newtype ZMem a = ZMem (ReaderT B.ByteString IO a) deriving (Functor, Monad, Applicative, MonadReader B.ByteString)
 newtype Handle = Handle { storyBytes :: B.ByteString }
 
 

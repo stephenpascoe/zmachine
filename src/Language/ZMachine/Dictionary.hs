@@ -1,30 +1,26 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
-module Lib.Dictionary ( dictionary
-                      , DictionaryHeader(..)
-                      , Dictionary(..)
-                      , showDictionary
-                      --
-                      , decodeWordEntries
-                      )
-where
+module Language.ZMachine.Dictionary
+  ( dictionary
+  , DictionaryHeader(..)
+  , Dictionary(..)
+  , showDictionary
+    --
+  , decodeWordEntries
+  ) where
 
 import Data.Binary.Get
-import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as B
-import Data.Word
 
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Builder as TB
-import qualified Data.Text.Encoding as TE
-import qualified Data.Char as C
 import qualified Formatting as F
-import Formatting ((%), (%.))
+import Formatting ((%))
 
+import qualified Language.ZMachine.Memory as M
+import qualified Language.ZMachine.ZSCII as Z
 
-import qualified Lib.Memory as M
-import qualified Lib.ZSCII as Z
 
 data DictionaryHeader = DictionaryHeader { inputCodes :: B.ByteString
                                          , entryLength :: Int

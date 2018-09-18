@@ -1,7 +1,7 @@
 module Main where
 
-import qualified Lib.Memory as M
-import qualified Lib.Dictionary as D
+import qualified Language.ZMachine.Memory as M
+import qualified Language.ZMachine.Dictionary as D
 import qualified Data.ByteString.Lazy as BL
 import System.Environment (getArgs)
 import Data.Binary.Get (runGet)
