@@ -4,6 +4,7 @@
 module Lib.Dictionary ( dictionary
                       , DictionaryHeader(..)
                       , Dictionary(..)
+                      , showDictionary
                       --
                       , decodeWordEntries
                       )
@@ -13,6 +14,14 @@ import Data.Binary.Get
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as B
 import Data.Word
+
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Builder as TB
+import qualified Data.Text.Encoding as TE
+import qualified Data.Char as C
+import qualified Formatting as F
+import Formatting ((%), (%.))
+
 
 import qualified Lib.Memory as M
 import qualified Lib.ZSCII as Z
@@ -67,3 +76,9 @@ decodeWordEntries v h = let nmax = numEntries h
                                      rest <- f (n+1)
                                      return $ entry:rest
                         in f 0
+
+
+showDictionary :: Dictionary -> TL.Text
+showDictionary dict = TB.toLazyText $ mconcat entryBs where
+  buildEntry (i, zseq) = F.bprint ("[" % F.int % "] " % F.stext % "\n") i (Z.zseqToText zseq)
+  entryBs = map buildEntry $ zip [0..] (entries dict)

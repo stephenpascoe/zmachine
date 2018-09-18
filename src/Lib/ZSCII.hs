@@ -5,6 +5,7 @@ module Lib.ZSCII ( decode
                  , ZSeq(..)
                  , ZSCII
                  , Version
+                 , zseqToText
                  -- For debugging
                  , ZChar
                  , packZchars
@@ -17,6 +18,8 @@ import Data.Word
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Builder as BB
+import qualified Data.Text.Encoding as TE
+import qualified Data.Text as T
 import Data.Monoid
 import Data.Binary.Get
 import Data.Bits
@@ -76,6 +79,9 @@ decode version (ZString str) = ZSeq $ BL.toStrict . BB.toLazyByteString . parsed
                     }
   state = foldl' consumeByte init $ runGet decodeZchars (BL.fromStrict str)
 
+
+zseqToText :: ZSeq -> T.Text
+zseqToText (ZSeq bstr) = TE.decodeLatin1 bstr
 
 consumeByte :: ParseState -> ZChar -> ParseState
 consumeByte state char =
