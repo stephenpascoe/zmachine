@@ -1,12 +1,9 @@
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
-import Test.QuickCheck.Instances
 
 import Data.Bits
-import qualified Data.ByteString as B
 
-import Lib.ZSCII
-import Data.List
+import Language.ZMachine.ZSCII
 
 main :: IO ()
 main = hspec $ do
