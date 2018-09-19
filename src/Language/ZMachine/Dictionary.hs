@@ -78,3 +78,19 @@ showDictionary :: Dictionary -> TL.Text
 showDictionary dict = TB.toLazyText $ mconcat entryBs where
   buildEntry (i, zseq) = F.bprint ("[" % F.int % "] " % F.stext % "\n") i (Z.zseqToText zseq)
   entryBs = map buildEntry $ zip [0..] (entries dict)
+
+
+-- Abreviations
+{-
+If a is the abbreviation character and b is the next character, then
+these point to abbreviation Eq(a-1)*32+b. A table of abbreviations is
+stored in memory (usually in RAM) beginning at the byte address stored
+in the header word at $18. This is a contiguous list of 32 (in V2) or
+96 (in V3+) words, which are the word addresses where the abbreviation
+Z-strings are stored.
+
+I.e.
+abbrevations are not fixed length.  Will need to implement the stop bit.
+Not same format as dictionary.  Table of pointers.
+
+-}
