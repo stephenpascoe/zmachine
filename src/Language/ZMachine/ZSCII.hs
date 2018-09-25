@@ -11,6 +11,7 @@ module Language.ZMachine.ZSCII
   , ZChar
   , packZchars
   , unpackZchars
+  , decodeZchars
   ) where
 
 import Data.Word
@@ -24,6 +25,7 @@ import Data.Binary.Get
 import Data.Bits
 import Data.List
 import Data.Int
+import Control.Applicative
 
 
 -- TODO : ZSCII strings should probably be based on ByteString not Text.  Need final conversion
@@ -148,15 +150,19 @@ byteToEvent' version char = if (char == 4) || (char == 5)
 
 
 -- | Parse a ByteString to a stream of ZChars
---   If mLength is provided parses that number of bytes, otherwise parse until stop bit is set.
+--   If there are an odd number of bytes in the bytestring the last byte will be discarded
 decodeZchars :: Get [ZChar]
-decodeZchars = do
-  empty <- isEmpty
-  if empty then return []
-    else do w <- getWord16be
-            zchars <- decodeZchars
-            let (z1, z2, z3) = unpackZchars w
-            return (z1:z2:z3:zchars)
+decodeZchars = decodeWords <|> decodeEndEven <|> decodeEndOdd where
+  decodeWords = do w <- getWord16be
+                   zchars <- decodeZchars
+                   let (z1, z2, z3) = unpackZchars w
+                   return (z1:z2:z3:zchars)
+  decodeEndEven = do emptyP <- isEmpty
+                     if emptyP then return [] else fail ""
+  decodeEndOdd = do _ <- getWord8
+                    emptyP <- isEmpty
+                    if emptyP then return [] else fail "Not all bytes consumed"
+
 
 unpackZchars :: Word16 -> (ZChar, ZChar, ZChar)
 unpackZchars w = (z1, z2, z3) where

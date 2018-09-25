@@ -1,7 +1,11 @@
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
+import Test.QuickCheck.Instances
 
 import Data.Bits
+import Data.Binary.Get
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString as B
 
 import Language.ZMachine.ZSCII
 
@@ -17,3 +21,14 @@ main = hspec $ do
       property $ \x -> let x' = x .&. 0x7fff
                        in
                          (packZchars . unpackZchars) x' == x'
+
+    it "Any bytestring will decode to something" $
+      property $ \x -> let zchars = runGet decodeZchars (BL.fromStrict x)
+                       in
+                         -- Ignores any trailing odd bytes
+                         case B.length x of
+                           0 -> zchars == []
+                           1 -> zchars == []
+                           _ -> length zchars > 0
+
+    -- TODO : test stop-bit logic
