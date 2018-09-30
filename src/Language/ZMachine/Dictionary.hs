@@ -12,6 +12,7 @@ module Language.ZMachine.Dictionary
 
 import Data.Binary.Get
 import qualified Data.ByteString as B
+import Data.Int
 
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Builder as TB
@@ -41,7 +42,7 @@ dictionary h = let header = M.getHeader h
                  runGet (decodeDictionary version) (M.streamStoryBytes h (fromIntegral dictOffset))
 
 
-decodeDictionary :: Z.Version -> Get Dictionary
+decodeDictionary :: Int8 -> Get Dictionary
 decodeDictionary v = do header <- decodeDictionaryHeader
                         -- Two bytes encodes 3 characters
                         let entryBytes = ceiling $ (fromIntegral $ entryLength header) * 2 / 3
@@ -62,7 +63,7 @@ decodeDictionaryHeader = do n <- getWord8
 
 
 -- TODO : use higher-order function instead of recursion
-decodeWordEntries :: Z.Version -> DictionaryHeader -> Get [Z.ZSeq]
+decodeWordEntries :: Int8 -> DictionaryHeader -> Get [Z.ZSeq]
 decodeWordEntries v h = let nmax = numEntries h
                             zlen = if v < 4 then 4 else 6
                             f n | n >= nmax = return []

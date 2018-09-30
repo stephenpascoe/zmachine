@@ -5,7 +5,6 @@ module Language.ZMachine.ZSCII
   , ZString(..)
   , ZSeq(..)
   , ZSCII
-  , Version
   , zseqToText
   -- For debugging
   , ZChar
@@ -34,7 +33,6 @@ import Control.Applicative
 -- | Characters
 type ZSCII = Word8
 type ZChar = Word8
-type Version = Int8
 
 -- | A ByteString representing ZString encoded characters
 newtype ZString = ZString B.ByteString deriving Show
@@ -54,7 +52,7 @@ data ZCharEvent = ShiftUpEvent Bool
 -- | ZCharState models the state machine used for converting ZCars to ZSCII
 
 data AbrevState = NoAbrevState | Abrev1State | Abrev2State | Abrev3State
-data ParseState = ParseState { currentVersion :: Version
+data ParseState = ParseState { currentVersion :: Int8
                              , currentAlphabet :: Alphabet
                              , nextCharAlphabet :: Maybe Alphabet
                              , abrevState :: AbrevState
@@ -70,7 +68,7 @@ shiftDown Alpha1 = Alpha0
 shiftDown Alpha2 = Alpha1
 
 
-decode :: Version -> ZString -> ZSeq
+decode :: Int8 -> ZString -> ZSeq
 decode version (ZString str) = ZSeq $ BL.toStrict . BB.toLazyByteString . parsedChars $ state where
   init = ParseState { currentVersion = version
                     , currentAlphabet = Alpha0
@@ -108,7 +106,7 @@ consumeByte state char =
 
 
 
-getAlphabetTable :: Version -> Alphabet -> ZSeq
+getAlphabetTable :: Int8 -> Alphabet -> ZSeq
 getAlphabetTable 1 Alpha0 = ZSeq "abcdefghijklmnopqrstuvwxyz"
 getAlphabetTable 1 Alpha1 = ZSeq "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 getAlphabetTable 1 Alpha2 = ZSeq "^0123456789.,!?_#'\"/\\<-:()"
@@ -116,14 +114,14 @@ getAlphabetTable _ Alpha0 = ZSeq "abcdefghijklmnopqrstuvwxyz"
 getAlphabetTable _ Alpha1 = ZSeq "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 getAlphabetTable _ Alpha2 = ZSeq "^\n0123456789.,!?_#'\"/\\-:()"
 
-byteToEvent :: Version -> Alphabet -> ZChar -> ZCharEvent
+byteToEvent :: Int8 -> Alphabet -> ZChar -> ZCharEvent
 byteToEvent version _ char
   | char < 6 = byteToEvent' version char
 byteToEvent version alphabet char
   | char < 32 = let ZSeq txt = getAlphabetTable version alphabet
                 in  ZSCIIEvent $ B.index txt (fromIntegral (char - 6))
 
-byteToEvent' :: Version -> ZChar -> ZCharEvent
+byteToEvent' :: Int8 -> ZChar -> ZCharEvent
 byteToEvent' _ 0 = ZSCIIEvent $ (toEnum . fromEnum) ' '
 byteToEvent' 1 1 = ZSCIIEvent $ (toEnum . fromEnum) '\n'
 byteToEvent' 2 1 = Abrev1Event
