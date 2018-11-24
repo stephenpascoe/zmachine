@@ -32,37 +32,8 @@ import Data.List
 import Data.Int
 import Control.Applicative
 
-import Language.ZMachine.Memory as M
+import Language.ZMachine.Types
 
-
-{-
-
-We need to represent 4 different forms of character data in this module
-
- 1. The on-disk encoding of strings as documented in the spec.  This is represented
-    as a strict ByteString wrapped in the ZString newtype
- 2. A sequence of ZChars.  A ZChar is a integer between 0 and 31.  ZChars are respresented
-    as lists of Word8
- 3. ZsciiString.  A byte encoding similar to latin1.  Represented as a newtype of ByteString.
- 4. Text.  For final output.
-
--}
-
-
--- TODO : move to a different module
-type AbbreviationTable = V.Vector ZsciiString
-type Version = Int8
-
--- | Characters
-type Zscii = Word8
-type ZChar = Word8
-
--- | A ByteString representing ZString encoded characters
-newtype ZString = ZString { unZString :: B.ByteString } deriving Show
--- | A ByteString representing a decoded ZString into a squence of Zscii charaters
-newtype ZsciiString = ZsciiString { unZsciiString :: B.ByteString } deriving Show
--- | A sequence of ZChars
-newtype ZChars = ZChars [ZChar]
 
 data Alphabet = Alpha0 | Alpha1 | Alpha2
 
@@ -181,13 +152,6 @@ decodeZString version aTable str =
     ZsciiString $ BL.toStrict . BB.toLazyByteString . parsedChars $ finalState
 
 
-
-
-
-
-
-
-
 --
 -- Decoding ByteStrings to ZChars
 --
@@ -216,7 +180,6 @@ encodeZchars = ZString . BL.toStrict . BB.toLazyByteString . encodeZchars'
 instance Binary ZChars where
   put = encodeZchars'
   get = decodeZchars'
-
 
 encodeZchars :: ZChars -> ZString
 encodeZchars zchars = ZString $ BL.toStrict $ Data.Binary.encode zchars

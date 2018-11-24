@@ -21,17 +21,7 @@ import Formatting ((%))
 
 import qualified Language.ZMachine.Memory as M
 import qualified Language.ZMachine.ZSCII as Z
-
-
-data DictionaryHeader = DictionaryHeader { inputCodes :: B.ByteString
-                                         , entryLength :: Int
-                                         , numEntries :: Int
-                                         } deriving Show
-
-data Dictionary = Dictionary { header :: DictionaryHeader
-                             , entries :: [Z.ZsciiString]
-                             } deriving Show
-
+import Language.ZMachine.Types
 
 
 dictionary :: M.Handle -> Dictionary
@@ -63,11 +53,11 @@ decodeDictionaryHeader = do n <- getWord8
 
 
 -- TODO : use higher-order function instead of recursion
-decodeWordEntries :: Int8 -> DictionaryHeader -> Get [Z.ZString]
+decodeWordEntries :: Int8 -> DictionaryHeader -> Get [ZString]
 decodeWordEntries v h = let nmax = numEntries h
                             zlen = if v < 4 then 4 else 6
                             f n | n >= nmax = return []
-                            f n = do zstr <- Z.ZString <$> getByteString zlen
+                            f n = do zstr <- ZString <$> getByteString zlen
                                      skip $ (entryLength h) - zlen
                                      rest <- f (n+1)
                                      return $ zstr:rest
