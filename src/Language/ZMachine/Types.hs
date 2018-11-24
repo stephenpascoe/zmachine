@@ -1,6 +1,7 @@
 
 module Language.ZMachine.Types
-  ( DictionaryHeader(..)
+  ( Header(..)
+  , DictionaryHeader(..)
   , Dictionary(..)
   , ZString(..)
   , ZsciiString(..)
@@ -16,6 +17,47 @@ import Data.Word
 import Data.Int
 import Data.Binary
 import qualified Data.Vector as V
+
+
+type ByteAddress = Word16
+type Colour = Word8
+
+-- TODO : Use real data types for flags
+type Flags1 = Word8
+type Flags2 = Word8
+
+data Header = Header { zVersion :: Int8
+                     , flags1 :: Flags1   -- Mutable
+                     , releaseNumber :: Word16
+                     , baseHighMemory :: ByteAddress
+                     , initPC :: Word16   -- Packed address in V6
+                     , dictionaryOffset :: ByteAddress
+                     , objectTable :: ByteAddress
+                     , variablesTable :: ByteAddress
+                     , baseStaticMemory :: ByteAddress
+                     , flags2 :: Flags2   -- Mutable
+                     , serialCode :: B.ByteString
+                     , abbreviationTableOffset :: ByteAddress
+                     , fileLength :: Word32
+                     , checksum :: Word16
+                     , interpreterNumber :: Word8
+                     , interpreterVersion :: Word8
+                     , screenHeightLines :: Word8
+                     , screenWidthChars :: Word8
+                     , screenWidth :: Word16 -- units or chars depending on version
+                     , screenHeight :: Word16
+                     , fontWidth :: Word8
+                     , fontHeight :: Word8
+                     , routinesOffset :: Word16
+                     , staticStringsOffset :: Word16
+                     , backgroundColour :: Colour -- Mutable
+                     , foregroundColour :: Colour -- Mutable
+                     , endCharacterTable :: ByteAddress
+                     , stream3OutputPixels :: Word16 -- Mutable
+                     , revisionNumber :: Word16 -- Mutable
+                     , alphabetTable :: ByteAddress
+                     , extensionTable :: ByteAddress
+                     } deriving Show
 
 
 data DictionaryHeader = DictionaryHeader { inputCodes :: B.ByteString

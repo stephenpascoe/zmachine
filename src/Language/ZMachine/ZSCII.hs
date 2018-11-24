@@ -21,8 +21,6 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Builder as BB
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text as T
-import qualified Data.Vector as V
-import Data.Vector ((!?))
 
 import Data.Binary
 import Data.Binary.Get
@@ -33,6 +31,7 @@ import Data.Int
 import Control.Applicative
 
 import Language.ZMachine.Types
+import Language.ZMachine.Abbreviation (getAbbreviation)
 
 
 data Alphabet = Alpha0 | Alpha1 | Alpha2
@@ -75,13 +74,6 @@ getAlphabetTable _ Alpha0 = ZsciiString "abcdefghijklmnopqrstuvwxyz"
 getAlphabetTable _ Alpha1 = ZsciiString "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 getAlphabetTable _ Alpha2 = ZsciiString "^\n0123456789.,!?_#'\"/\\-:()"
 
--- TODO : Replace error with exception monad
-getAbbreviation :: Maybe AbbreviationTable -> Int8 -> Word8 -> ZsciiString
-getAbbreviation Nothing _ _ = error "No abbreviations available"
-getAbbreviation (Just t) a b = case t !? (fromIntegral (a * 32) + fromIntegral b) of
-                                 Nothing -> error "Abbreviation index out of range"
-                                 Just x -> x
-
 
 decodeZString :: Version                 -- ^ ZMachine version
               -> Maybe AbbreviationTable -- ^ Abbreviations, if available
@@ -119,9 +111,9 @@ decodeZString version aTable str =
             Abrev1Event -> state { abrevState = Abrev1State
                                  , parsedChars = parsedChars state <> (BB.byteString . unZsciiString . getAbbreviation aTable 1) char }
             Abrev2Event -> state { abrevState = Abrev2State
-                                 , parsedChars = parsedChars state <> (BB.byteString . unZsciiString . getAbbreviation aTable 1) char }
+                                 , parsedChars = parsedChars state <> (BB.byteString . unZsciiString . getAbbreviation aTable 2) char }
             Abrev3Event -> state { abrevState = Abrev3State
-                                 , parsedChars = parsedChars state <> (BB.byteString . unZsciiString . getAbbreviation aTable 1) char }
+                                 , parsedChars = parsedChars state <> (BB.byteString . unZsciiString . getAbbreviation aTable 3) char }
 
 
       byteToEvent :: Alphabet -> ZChar -> ZCharEvent
