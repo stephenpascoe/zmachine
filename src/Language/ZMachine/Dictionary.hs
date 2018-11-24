@@ -29,7 +29,7 @@ data DictionaryHeader = DictionaryHeader { inputCodes :: B.ByteString
                                          } deriving Show
 
 data Dictionary = Dictionary { header :: DictionaryHeader
-                             , entries :: [Z.ZSeq]
+                             , entries :: [Z.ZsciiString]
                              } deriving Show
 
 
@@ -38,18 +38,18 @@ dictionary :: M.Handle -> Dictionary
 dictionary h = let header = M.getHeader h
                    dictOffset = M.dictionary header
                    version = M.version header
+                   aTable = Nothing
                in
-                 runGet (decodeDictionary version) (M.streamStoryBytes h (fromIntegral dictOffset))
+                 runGet (decodeDictionary version aTable) (M.streamStoryBytes h (fromIntegral dictOffset))
 
 
-decodeDictionary :: Int8 -> Get Dictionary
-decodeDictionary v = do header <- decodeDictionaryHeader
-                        -- Two bytes encodes 3 characters
-                        let entryBytes = ceiling $ (fromIntegral $ entryLength header) * 2 / 3
-                            totalBytes = entryBytes * (numEntries header)
-                        entries <- decodeWordEntries v header
-                        return $ Dictionary header entries
-
+-- TODO : Version into type module
+decodeDictionary :: Int8 -> Maybe Z.AbbreviationTable -> Get Dictionary
+decodeDictionary version aTable = do
+  dHeader <- decodeDictionaryHeader
+  rawEntries <- decodeWordEntries version dHeader
+  let entries = fmap (Z.decodeZString version aTable) rawEntries
+  return $ Dictionary dHeader entries
 
 decodeDictionaryHeader :: Get DictionaryHeader
 decodeDictionaryHeader = do n <- getWord8
@@ -63,15 +63,14 @@ decodeDictionaryHeader = do n <- getWord8
 
 
 -- TODO : use higher-order function instead of recursion
-decodeWordEntries :: Int8 -> DictionaryHeader -> Get [Z.ZSeq]
+decodeWordEntries :: Int8 -> DictionaryHeader -> Get [Z.ZString]
 decodeWordEntries v h = let nmax = numEntries h
                             zlen = if v < 4 then 4 else 6
                             f n | n >= nmax = return []
                             f n = do zstr <- Z.ZString <$> getByteString zlen
-                                     let entry = Z.decode v zstr
                                      skip $ (entryLength h) - zlen
                                      rest <- f (n+1)
-                                     return $ entry:rest
+                                     return $ zstr:rest
                         in f 0
 
 

@@ -1,13 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Language.ZMachine.ZSCII
-  ( decode
+  ( decodeZString
+  , AbbreviationTable
   , ZString(..)
-  , ZSeq(..)
-  , ZSCII
+  , ZsciiString(..)
+  , Zscii
   , zseqToText
   -- For debugging
   , ZChar
+  , ZChars(..)
   , packZchars
   , unpackZchars
   , decodeZchars
@@ -19,25 +21,48 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Builder as BB
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text as T
-import Data.Monoid
+import qualified Data.Vector as V
+import Data.Vector ((!?))
+
+import Data.Binary
 import Data.Binary.Get
+
 import Data.Bits
 import Data.List
 import Data.Int
 import Control.Applicative
 
+import Language.ZMachine.Memory as M
 
--- TODO : ZSCII strings should probably be based on ByteString not Text.  Need final conversion
---        to text.
+
+{-
+
+We need to represent 4 different forms of character data in this module
+
+ 1. The on-disk encoding of strings as documented in the spec.  This is represented
+    as a strict ByteString wrapped in the ZString newtype
+ 2. A sequence of ZChars.  A ZChar is a integer between 0 and 31.  ZChars are respresented
+    as lists of Word8
+ 3. ZsciiString.  A byte encoding similar to latin1.  Represented as a newtype of ByteString.
+ 4. Text.  For final output.
+
+-}
+
+
+-- TODO : move to a different module
+type AbbreviationTable = V.Vector ZsciiString
+type Version = Int8
 
 -- | Characters
-type ZSCII = Word8
+type Zscii = Word8
 type ZChar = Word8
 
 -- | A ByteString representing ZString encoded characters
-newtype ZString = ZString B.ByteString deriving Show
--- | A ByteString representing a decoded ZString into a squence of ZSCII charaters
-newtype ZSeq = ZSeq B.ByteString deriving Show
+newtype ZString = ZString { unZString :: B.ByteString } deriving Show
+-- | A ByteString representing a decoded ZString into a squence of Zscii charaters
+newtype ZsciiString = ZsciiString { unZsciiString :: B.ByteString } deriving Show
+-- | A sequence of ZChars
+newtype ZChars = ZChars [ZChar]
 
 data Alphabet = Alpha0 | Alpha1 | Alpha2
 
@@ -47,18 +72,18 @@ data ZCharEvent = ShiftUpEvent Bool
                 | Abrev1Event
                 | Abrev2Event
                 | Abrev3Event
-                | ZSCIIEvent ZSCII
+                | ZsciiEvent Zscii
 
--- | ZCharState models the state machine used for converting ZCars to ZSCII
+-- | ZCharState models the state machine used for converting ZCars to Zscii
 
 data AbrevState = NoAbrevState | Abrev1State | Abrev2State | Abrev3State
-data ParseState = ParseState { currentVersion :: Int8
-                             , currentAlphabet :: Alphabet
-                             , nextCharAlphabet :: Maybe Alphabet
+data ParseState = ParseState { alphabetState :: AlphabetState
                              , abrevState :: AbrevState
                              , parsedChars :: BB.Builder
                              }
-
+data AlphabetState = AlphabetState { currentAlphabet :: Alphabet
+                                   , nextAlphabet :: Maybe Alphabet
+                                   }
 
 shiftUp Alpha0 = Alpha1
 shiftUp Alpha1 = Alpha2
@@ -68,76 +93,97 @@ shiftDown Alpha1 = Alpha0
 shiftDown Alpha2 = Alpha1
 
 
-decode :: Int8 -> ZString -> ZSeq
-decode version (ZString str) = ZSeq $ BL.toStrict . BB.toLazyByteString . parsedChars $ state where
-  init = ParseState { currentVersion = version
-                    , currentAlphabet = Alpha0
-                    , abrevState = NoAbrevState
-                    , nextCharAlphabet = Nothing
-                    , parsedChars = mempty
-                    }
-  state = foldl' consumeByte init $ runGet decodeZchars (BL.fromStrict str)
+zseqToText :: ZsciiString -> T.Text
+zseqToText (ZsciiString bstr) = TE.decodeLatin1 bstr
+
+getAlphabetTable :: Version -> Alphabet -> ZsciiString
+getAlphabetTable 1 Alpha0 = ZsciiString "abcdefghijklmnopqrstuvwxyz"
+getAlphabetTable 1 Alpha1 = ZsciiString "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+getAlphabetTable 1 Alpha2 = ZsciiString "^0123456789.,!?_#'\"/\\<-:()"
+getAlphabetTable _ Alpha0 = ZsciiString "abcdefghijklmnopqrstuvwxyz"
+getAlphabetTable _ Alpha1 = ZsciiString "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+getAlphabetTable _ Alpha2 = ZsciiString "^\n0123456789.,!?_#'\"/\\-:()"
+
+-- TODO : Replace error with exception monad
+getAbbreviation :: Maybe AbbreviationTable -> Int8 -> Word8 -> ZsciiString
+getAbbreviation Nothing _ _ = error "No abbreviations available"
+getAbbreviation (Just t) a b = case t !? (fromIntegral (a * 32) + fromIntegral b) of
+                                 Nothing -> error "Abbreviation index out of range"
+                                 Just x -> x
 
 
-zseqToText :: ZSeq -> T.Text
-zseqToText (ZSeq bstr) = TE.decodeLatin1 bstr
+decodeZString :: Version                 -- ^ ZMachine version
+              -> Maybe AbbreviationTable -- ^ Abbreviations, if available
+              -> ZString                 -- ^ Input ZString
+              -> ZsciiString             -- ^ Resulting ZsciiString
+decodeZString version aTable str =
+  let init = ParseState { alphabetState = AlphabetState Alpha0 Nothing
+                        , abrevState = NoAbrevState
+                        , parsedChars = mempty
+                        }
 
-consumeByte :: ParseState -> ZChar -> ParseState
-consumeByte state char =
-  let
-    alpha = currentAlphabet state
-    shift shiftF lock = state { currentAlphabet = shiftF alpha
-                              , nextCharAlphabet = if lock then Nothing else Just alpha
-                              }
+      alphabetTable = getAlphabetTable version
+
+      ZChars bs = decodeZchars str
+      finalState = foldl' consumeByte init bs
+
+      consumeByte :: ParseState -> ZChar -> ParseState
+      consumeByte state char =
+        let alpha = currentAlphabet . alphabetState $ state
+            shift shiftF lock = state { alphabetState = AlphabetState (shiftF alpha)
+                                                                      (if lock then Nothing else Just alpha)
+                                      }
+        in
+          case byteToEvent alpha char of
+            ZsciiEvent z -> state { parsedChars = parsedChars state <> BB.word8 z
+                                  , alphabetState = AlphabetState (case nextAlphabet . alphabetState $ state of
+                                                                     Nothing -> alpha
+                                                                     Just a -> a
+                                                                  ) Nothing
+                                  }
+            ShiftUpEvent lock -> shift shiftUp lock
+            ShiftDownEvent lock -> shift shiftDown lock
+
+            -- TODO : parseChars should probably have type ZsciiString
+            Abrev1Event -> state { abrevState = Abrev1State
+                                 , parsedChars = parsedChars state <> (BB.byteString . unZsciiString . getAbbreviation aTable 1) char }
+            Abrev2Event -> state { abrevState = Abrev2State
+                                 , parsedChars = parsedChars state <> (BB.byteString . unZsciiString . getAbbreviation aTable 1) char }
+            Abrev3Event -> state { abrevState = Abrev3State
+                                 , parsedChars = parsedChars state <> (BB.byteString . unZsciiString . getAbbreviation aTable 1) char }
+
+
+      byteToEvent :: Alphabet -> ZChar -> ZCharEvent
+      byteToEvent _ 0 = ZsciiEvent $ (toEnum . fromEnum) ' '
+      byteToEvent _ 1
+        | version == 1 = ZsciiEvent $ (toEnum . fromEnum) '\n'
+        | version == 2 = Abrev1Event
+      byteToEvent _ char
+        | char < 6 && version < 3 = case char of
+                                      2 -> ShiftUpEvent False
+                                      3 -> ShiftDownEvent False
+                                      4 -> ShiftDownEvent True
+                                      5 -> ShiftDownEvent True
+      byteToEvent _ char
+        | char < 6 = case char of
+                       1 -> Abrev1Event
+                       2 -> Abrev2Event
+                       3 -> Abrev3Event
+                       4 -> ShiftUpEvent False
+                       5 -> ShiftDownEvent False
+
+      byteToEvent alphabet char
+        | char < 32 = let ZsciiString txt = alphabetTable alphabet
+                      in
+                        ZsciiEvent $ B.index txt (fromIntegral (char - 6))
+
   in
-    case byteToEvent (currentVersion state) alpha char of
-      ZSCIIEvent z -> state { parsedChars = parsedChars state <> BB.word8 z
-                            , currentAlphabet = case nextCharAlphabet state of
-                                                  Nothing -> alpha
-                                                  Just a -> a
-                            , nextCharAlphabet = Nothing
-                            }
-      ShiftUpEvent lock -> shift shiftUp lock
-      ShiftDownEvent lock -> shift shiftDown lock
-
-      Abrev1Event -> undefined
-      Abrev2Event -> undefined
-      Abrev3Event -> undefined
+    ZsciiString $ BL.toStrict . BB.toLazyByteString . parsedChars $ finalState
 
 
 
-getAlphabetTable :: Int8 -> Alphabet -> ZSeq
-getAlphabetTable 1 Alpha0 = ZSeq "abcdefghijklmnopqrstuvwxyz"
-getAlphabetTable 1 Alpha1 = ZSeq "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-getAlphabetTable 1 Alpha2 = ZSeq "^0123456789.,!?_#'\"/\\<-:()"
-getAlphabetTable _ Alpha0 = ZSeq "abcdefghijklmnopqrstuvwxyz"
-getAlphabetTable _ Alpha1 = ZSeq "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-getAlphabetTable _ Alpha2 = ZSeq "^\n0123456789.,!?_#'\"/\\-:()"
 
-byteToEvent :: Int8 -> Alphabet -> ZChar -> ZCharEvent
-byteToEvent version _ char
-  | char < 6 = byteToEvent' version char
-byteToEvent version alphabet char
-  | char < 32 = let ZSeq txt = getAlphabetTable version alphabet
-                in  ZSCIIEvent $ B.index txt (fromIntegral (char - 6))
 
-byteToEvent' :: Int8 -> ZChar -> ZCharEvent
-byteToEvent' _ 0 = ZSCIIEvent $ (toEnum . fromEnum) ' '
-byteToEvent' 1 1 = ZSCIIEvent $ (toEnum . fromEnum) '\n'
-byteToEvent' 2 1 = Abrev1Event
-byteToEvent' version char | version < 3 = case char of
-                                            2 -> ShiftUpEvent False
-                                            3 -> ShiftDownEvent False
-                                            4 -> ShiftDownEvent True
-                                            5 -> ShiftDownEvent True
-byteToEvent' version char = if (char == 4) || (char == 5)
-                            then case char of
-                                   4 -> ShiftUpEvent False
-                                   5 -> ShiftDownEvent False
-                            else case char of
-                                   1 -> Abrev1Event
-                                   2 -> Abrev2Event
-                                   3 -> Abrev3Event
 
 
 
@@ -148,19 +194,56 @@ byteToEvent' version char = if (char == 4) || (char == 5)
 
 
 -- | Parse a ByteString to a stream of ZChars
---   If there are an odd number of bytes in the bytestring the last byte will be discarded
-decodeZchars :: Get [ZChar]
-decodeZchars = decodeWords <|> decodeEndEven <|> decodeEndOdd where
-  decodeWords = do w <- getWord16be
-                   zchars <- decodeZchars
-                   let (z1, z2, z3) = unpackZchars w
-                   return (z1:z2:z3:zchars)
-  decodeEndEven = do emptyP <- isEmpty
-                     if emptyP then return [] else fail ""
-  decodeEndOdd = do _ <- getWord8
-                    emptyP <- isEmpty
-                    if emptyP then return [] else fail "Not all bytes consumed"
+--   If there are an odd number of bytes in the bytestring the last byte will be discarded.
+--   Reads the ByteString until a stop-bit occurs or until the end.
 
+decodeZchars :: ZString -> ZChars
+decodeZchars (ZString bs) = Data.Binary.decode (BL.fromStrict bs)
+
+decodeZchars' ::  Get ZChars
+decodeZchars' = decodeWords <|> return (ZChars []) where
+  decodeWords = do w <- getWord16be
+                   let (z1, z2, z3) = unpackZchars w
+                   if hasStopBit w then return $ ZChars [z1, z2, z3] else do
+                     ZChars zchars <- decodeZchars'
+                     return $ ZChars (z1:z2:z3:zchars)
+
+{-
+encodeZchars :: ZChars -> ZString
+encodeZchars = ZString . BL.toStrict . BB.toLazyByteString . encodeZchars'
+-}
+
+instance Binary ZChars where
+  put = encodeZchars'
+  get = decodeZchars'
+
+
+encodeZchars :: ZChars -> ZString
+encodeZchars zchars = ZString $ BL.toStrict $ Data.Binary.encode zchars
+
+encodeZchars' :: ZChars -> Put
+encodeZchars' (ZChars [z1, z2, z3]) = do
+  let word = addStopBit $ packZchars (z1, z2, z3)
+  put word
+
+encodeZchars' (ZChars [z1, z2]) = do
+  let word = addStopBit $ packZchars (z1, z2, 0)
+  put word
+
+encodeZchars' (ZChars [z1]) = do
+  let word = addStopBit $ packZchars (z1, 0, 0)
+  put word
+encodeZchars' (ZChars (z1:z2:z3:rest)) = do
+  let word = packZchars (z1, z2, z3)
+  put word
+  encodeZchars' $ ZChars rest
+encodeZchars' (ZChars []) = return ()
+
+hasStopBit :: Word16 -> Bool
+hasStopBit w = w .&. 0x8000 == 0x8000
+
+addStopBit :: Word16 -> Word16
+addStopBit w = w .|. 0x8000
 
 unpackZchars :: Word16 -> (ZChar, ZChar, ZChar)
 unpackZchars w = (z1, z2, z3) where

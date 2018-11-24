@@ -3,7 +3,6 @@ import Test.QuickCheck hiding ((.&.))
 import Test.QuickCheck.Instances
 
 import Data.Bits
-import Data.Binary.Get
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as B
 
@@ -22,8 +21,9 @@ main = hspec $ do
                        in
                          (packZchars . unpackZchars) x' == x'
 
+  describe "ZString" $ do
     it "Any bytestring will decode to something" $
-      property $ \x -> let zchars = runGet decodeZchars (BL.fromStrict x)
+      property $ \x -> let (ZChars zchars) = decodeZchars (ZString x)
                        in
                          -- Ignores any trailing odd bytes
                          case B.length x of
@@ -32,3 +32,10 @@ main = hspec $ do
                            _ -> length zchars > 0
 
     -- TODO : test stop-bit logic
+
+-- Quickcheck instances
+
+instance Arbitrary ZChars where
+  arbitrary = do
+    len <- arbitrary
+    ZChars <$> vector len

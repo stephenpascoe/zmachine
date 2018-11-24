@@ -30,6 +30,8 @@ dependencies:
 - hspec
 - QuickCheck
 - quickcheck-instances
+- mtl
+- transformers
 
 library:
   source-dirs: src
