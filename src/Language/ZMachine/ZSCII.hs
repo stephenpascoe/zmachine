@@ -3,6 +3,7 @@
 module Language.ZMachine.ZSCII
   ( decodeZString
   , AbbreviationTable
+  , abbreviationTable
   , ZString(..)
   , ZsciiString(..)
   , Zscii
@@ -21,6 +22,8 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Builder as BB
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text as T
+import qualified Data.Vector as V
+import Data.Vector ((!?))
 
 import Data.Binary
 import Data.Binary.Get
@@ -31,7 +34,7 @@ import Data.Int
 import Control.Applicative
 
 import Language.ZMachine.Types
-import Language.ZMachine.Abbreviation (getAbbreviation)
+import qualified Language.ZMachine.Memory as M
 
 
 data Alphabet = Alpha0 | Alpha1 | Alpha2
@@ -211,3 +214,45 @@ unpackZchars w = (z1, z2, z3) where
 
 packZchars :: (ZChar, ZChar, ZChar) -> Word16
 packZchars (z1, z2, z3) = (fromIntegral z3) .|. ((fromIntegral z2) `shift` 5) .|. ((fromIntegral z1) `shift` 10)
+
+
+-- Abreviations
+{-
+If a is the abbreviation character and b is the next character, then
+these point to abbreviation Eq(a-1)*32+b. A table of abbreviations is
+stored in memory (usually in RAM) beginning at the byte address stored
+in the header word at $18. This is a contiguous list of 32 (in V2) or
+96 (in V3+) words, which are the word addresses where the abbreviation
+Z-strings are stored.
+
+I.e.
+abbrevations are not fixed length.  Will need to implement the stop bit.
+Not same format as dictionary.  Table of pointers.
+
+-}
+
+-- TODO : Replace error with exception monad
+getAbbreviation :: Maybe AbbreviationTable -> Int8 -> Word8 -> ZsciiString
+getAbbreviation Nothing _ _ = error "No abbreviations available"
+getAbbreviation (Just t) a b = case t !? (fromIntegral (a * 32) + fromIntegral b) of
+                                 Nothing -> error "Abbreviation index out of range"
+                                 Just x -> x
+
+
+abbreviationTable :: M.Handle -> AbbreviationTable
+abbreviationTable h = let header = M.getHeader h
+                          aTableOffset = abbreviationTableOffset header
+                          version = zVersion header
+                          aTableSize | version == 1 = 0
+                                     | version == 2 = 32
+                                     | otherwise    = 96
+                          offsetsGet = sequence $ replicate aTableSize getWord16be
+
+                          readFrom offset = M.streamStoryBytes h (fromIntegral offset)
+
+                          -- Word addresses are stored / 2
+                          offsets = map (*2) $ runGet offsetsGet (readFrom aTableOffset)
+
+                          getEntry addr = decodeZString version Nothing (ZString . BL.toStrict $ readFrom addr)
+                      in
+                        V.fromListN aTableSize $ map getEntry offsets
