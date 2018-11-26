@@ -16,6 +16,8 @@ module Language.ZMachine.ZSCII
   , decodeZchars
   ) where
 
+import Debug.Trace
+
 import Data.Word
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
@@ -138,6 +140,8 @@ decodeZString version aTable str =
                        4 -> ShiftUpEvent False
                        5 -> ShiftDownEvent False
 
+      -- TODO : char == 6 in A2 handled differently
+
       byteToEvent alphabet char
         | char < 32 = let ZsciiString txt = alphabetTable alphabet
                       in
@@ -240,19 +244,20 @@ getAbbreviation (Just t) a b = case t !? (fromIntegral (a * 32) + fromIntegral b
 
 
 abbreviationTable :: M.Handle -> AbbreviationTable
-abbreviationTable h = let header = M.getHeader h
-                          aTableOffset = abbreviationTableOffset header
-                          version = zVersion header
-                          aTableSize | version == 1 = 0
-                                     | version == 2 = 32
-                                     | otherwise    = 96
-                          offsetsGet = sequence $ replicate aTableSize getWord16be
+abbreviationTable h =
+  let header = M.getHeader h
+      aTableOffset = abbreviationTableOffset header
+      version = zVersion header
+      aTableSize | version == 1 = 0
+                 | version == 2 = 32
+                 | otherwise    = 96
 
-                          readFrom offset = M.streamStoryBytes h (fromIntegral offset)
+      readFrom offset = M.streamStoryBytes h (fromIntegral offset)
 
-                          -- Word addresses are stored / 2
-                          offsets = map (*2) $ runGet offsetsGet (readFrom aTableOffset)
+      -- Word addresses are stored / 2
+      offsets = map (*2) $ runGet (sequence $ replicate aTableSize getWord16be)
+                                  (readFrom aTableOffset)
 
-                          getEntry addr = decodeZString version Nothing (ZString . BL.toStrict $ readFrom addr)
-                      in
-                        V.fromListN aTableSize $ map getEntry offsets
+      getEntry addr = decodeZString version Nothing (ZString . BL.toStrict $ readFrom addr)
+  in
+    V.fromListN aTableSize $ map getEntry offsets
