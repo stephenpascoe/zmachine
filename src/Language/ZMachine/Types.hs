@@ -72,13 +72,13 @@ data Dictionary = Dictionary { header :: DictionaryHeader
 
 {-
 
-We need to represent 4 different forms of character data in this module
+We need to represent 4 different forms of character data
 
  1. The on-disk encoding of strings as documented in the spec.  This is represented
     as a strict ByteString wrapped in the ZString newtype
  2. A sequence of ZChars.  A ZChar is a integer between 0 and 31.  ZChars are respresented
     as lists of Word8
- 3. ZsciiString.  A byte encoding similar to latin1.  Represented as a newtype of ByteString.
+ 3. ZsciiString.  A byte encoding similar to latin1 referred to as ZSCII chars in the spec.  Represented as a newtype of ByteString.
  4. Text.  For final output.
 
 -}
