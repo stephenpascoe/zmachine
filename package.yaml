@@ -32,6 +32,7 @@ dependencies:
 - quickcheck-instances
 - mtl
 - transformers
+- parsec
 
 library:
   source-dirs: src
