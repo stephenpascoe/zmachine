@@ -2,6 +2,10 @@
 
 module Language.ZMachine.ZSCII.ZChars
  ( zstrToZchars
+ , zcharsToZstr
+ -- Internal
+ , packZchars
+ , unpackZchars
  ) where
 
 import qualified Data.ByteString.Lazy as BL
@@ -22,6 +26,10 @@ data Alphabet = Alpha0 | Alpha1 | Alpha2
 
 zstrToZchars :: ZString -> ZChars
 zstrToZchars (ZString bs) = Data.Binary.decode (BL.fromStrict bs)
+
+zcharsToZstr :: ZChars -> ZString
+zcharsToZstr zchars = ZString $ BL.toStrict $ Data.Binary.encode zchars
+
 
 decodeZchars' ::  Get ZChars
 decodeZchars' = decodeWords <|> return (ZChars []) where

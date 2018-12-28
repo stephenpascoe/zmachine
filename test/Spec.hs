@@ -6,7 +6,8 @@ import Data.Bits
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as B
 
-import Language.ZMachine.ZSCII
+import Language.ZMachine.Types
+import Language.ZMachine.ZSCII.ZChars
 
 main :: IO ()
 main = hspec $ do
@@ -23,13 +24,20 @@ main = hspec $ do
 
   describe "ZString" $ do
     it "Any bytestring will decode to something" $
-      property $ \x -> let (ZChars zchars) = decodeZchars (ZString x)
+      property $ \x -> let (ZChars zchars) = zstrToZchars (ZString x)
                        in
                          -- Ignores any trailing odd bytes
                          case B.length x of
                            0 -> zchars == []
                            1 -> zchars == []
                            _ -> length zchars > 0
+
+    it "Any bytestring will roundtrip" $
+      property $ \x -> let zstr = ZString $ B.pack x
+                           zchars = zstrToZchars zstr
+                           zstr' = zcharsToZstr zchars
+                       in
+                         zstr == zstr'
 
     -- TODO : test stop-bit logic
 
