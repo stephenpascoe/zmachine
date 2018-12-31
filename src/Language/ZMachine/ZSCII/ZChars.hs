@@ -1,5 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+{- ZChars encode 3 chars into 2 bytes.
+
+-- Ending a string early
+
+3.6
+
+Since the end-bit only comes up once every three Z-characters, a string may have to be
+'padded out' with null values. This is conventionally achieved with a sequence of 5's, though
+a sequence of (for example) 4's would work equally well.
+
+-}
+
 module Language.ZMachine.ZSCII.ZChars
  ( zstrToZchars
  , zcharsToZstr
@@ -20,6 +32,8 @@ import Language.ZMachine.Types
 
 data Alphabet = Alpha0 | Alpha1 | Alpha2
 
+paddingChar = 5 :: ZChar
+
 -- | Parse a ByteString to a stream of ZChars
 --   If there are an odd number of bytes in the bytestring the last byte will be discarded.
 --   Reads the ByteString until a stop-bit occurs or until the end.
@@ -31,18 +45,16 @@ zcharsToZstr :: ZChars -> ZString
 zcharsToZstr zchars = ZString $ BL.toStrict $ Data.Binary.encode zchars
 
 
+-- TODO : If hasStopBit and final chars are padding
 decodeZchars' ::  Get ZChars
 decodeZchars' = decodeWords <|> return (ZChars []) where
   decodeWords = do w <- getWord16be
                    let (z1, z2, z3) = unpackZchars w
-                   if hasStopBit w then return $ ZChars [z1, z2, z3] else do
-                     ZChars zchars <- decodeZchars'
-                     return $ ZChars (z1:z2:z3:zchars)
+                   if hasStopBit w
+                     then return $ ZChars (takeWhile ((/=) paddingChar) [z1, z2, z3])
+                     else do ZChars zchars <- decodeZchars'
+                             return $ ZChars (z1:z2:z3:zchars)
 
-{-
-encodeZchars :: ZChars -> ZString
-encodeZchars = ZString . BL.toStrict . BB.toLazyByteString . encodeZchars'
--}
 
 instance Binary ZChars where
   put = encodeZchars'
@@ -57,11 +69,11 @@ encodeZchars' (ZChars [z1, z2, z3]) = do
   put word
 
 encodeZchars' (ZChars [z1, z2]) = do
-  let word = addStopBit $ packZchars (z1, z2, 0)
+  let word = addStopBit $ packZchars (z1, z2, paddingChar)
   put word
 
 encodeZchars' (ZChars [z1]) = do
-  let word = addStopBit $ packZchars (z1, 0, 0)
+  let word = addStopBit $ packZchars (z1, paddingChar, paddingChar)
   put word
 encodeZchars' (ZChars (z1:z2:z3:rest)) = do
   let word = packZchars (z1, z2, z3)

@@ -97,5 +97,5 @@ newtype ZString = ZString { unZString :: B.ByteString } deriving (Show, Eq)
 
 -- | A ByteString representing a decoded ZString into a squence of Zscii charaters
 newtype ZsciiString = ZsciiString { unZsciiString :: B.ByteString } deriving (Show, Eq)
--- | A sequence of ZChars
+-- | A sequence of ZChars.  Should be 0 to 31.
 newtype ZChars = ZChars [ZChar] deriving (Show, Eq)

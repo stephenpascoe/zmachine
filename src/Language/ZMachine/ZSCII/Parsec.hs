@@ -35,10 +35,12 @@ decodeZString :: Version                 -- ^ ZMachine version
               -> Maybe AbbreviationTable -- ^ Abbreviations, if available
               -> ZString                 -- ^ Input ZString
               -> ZsciiString             -- ^ Resulting ZsciiString
-decodeZString version aTable zstr =
+decodeZString version aTable zstr = zcharsToZscii version aTable (zstrToZchars zstr)
+
+zcharsToZscii :: Version -> Maybe AbbreviationTable -> ZChars -> ZsciiString
+zcharsToZscii version aTable (ZChars zchars) =
   let alphabetTable = getAlphabetTable version
       init = Alpha0
-      ZChars zchars = zstrToZchars zstr
 
       pureChar :: Char -> ZsciiParsec Word8
       pureChar = pure . fromIntegral . fromEnum
@@ -91,6 +93,7 @@ decodeZString version aTable zstr =
                              else abbrev 1
                         2 -> shiftUpOnce
                         3 -> shiftDownOnce
+                        -- TODO : 4/5 can occur at end of input, therefore element is optional
                         4 -> shiftDown *> element
                         5 -> shiftUp *> element
                         6 -> pureChar '@' -- error "char 6" -- handle char 6 in A2
