@@ -6,7 +6,6 @@ module Language.ZMachine.Types
   , Dictionary(..)
   , ZString(..)
   , ZsciiString(..)
-  , ZChars(..)
   , Zscii
   , ZChar
   , AbbreviationTable
@@ -96,9 +95,5 @@ type ZChar = Word8
 newtype ZString = ZString { unZString :: B.ByteString } deriving (Show, Eq)
 
 
-
-
 -- | A ByteString representing a decoded ZString into a squence of Zscii charaters
 newtype ZsciiString = ZsciiString { unZsciiString :: B.ByteString } deriving (Show, Eq)
--- | A sequence of ZChars.  Should be 0 to 31.
-newtype ZChars = ZChars [ZChar] deriving (Show, Eq)

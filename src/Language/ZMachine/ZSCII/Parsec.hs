@@ -37,8 +37,8 @@ decodeZString :: Version                 -- ^ ZMachine version
               -> ZsciiString             -- ^ Resulting ZsciiString
 decodeZString version aTable zstr = zcharsToZscii version aTable (zstrToZchars zstr)
 
-zcharsToZscii :: Version -> Maybe AbbreviationTable -> ZChars -> ZsciiString
-zcharsToZscii version aTable (ZChars zchars) =
+zcharsToZscii :: Version -> Maybe AbbreviationTable -> [ZChar] -> ZsciiString
+zcharsToZscii version aTable zchars =
   let alphabetTable = getAlphabetTable version
       init = Alpha0
 
