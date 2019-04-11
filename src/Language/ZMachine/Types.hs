@@ -17,6 +17,7 @@ import qualified Data.ByteString as B
 import Data.Word
 import Data.Int
 import Data.Binary
+import Data.Foldable
 import qualified Data.Vector as V
 
 type ByteAddress = Word16
@@ -93,6 +94,8 @@ type ZChar = Word8
 
 -- | A ByteString representing ZString encoded characters
 newtype ZString = ZString { unZString :: B.ByteString } deriving (Show, Eq)
+
+
 
 
 -- | A ByteString representing a decoded ZString into a squence of Zscii charaters

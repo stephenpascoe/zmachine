@@ -15,9 +15,11 @@ a sequence of (for example) 4's would work equally well.
 module Language.ZMachine.ZSCII.ZChars
  ( zstrToZchars
  , zcharsToZstr
+ , zcharsLen
  -- Internal
  , packZchars
  , unpackZchars
+ , hasStopBit
  ) where
 
 import qualified Data.ByteString.Lazy as BL
@@ -45,23 +47,20 @@ zcharsToZstr :: ZChars -> ZString
 zcharsToZstr zchars = ZString $ BL.toStrict $ Data.Binary.encode zchars
 
 
--- TODO : If hasStopBit and final chars are padding
+instance Binary ZChars where
+  put = encodeZchars'
+  get = decodeZchars'
+
+
 decodeZchars' ::  Get ZChars
 decodeZchars' = decodeWords <|> return (ZChars []) where
   decodeWords = do w <- getWord16be
                    let (z1, z2, z3) = unpackZchars w
                    if hasStopBit w
-                     then return $ ZChars (takeWhile ((/=) paddingChar) [z1, z2, z3])
+                     then return $ ZChars [z1, z2, z3]
                      else do ZChars zchars <- decodeZchars'
                              return $ ZChars (z1:z2:z3:zchars)
 
-
-instance Binary ZChars where
-  put = encodeZchars'
-  get = decodeZchars'
-
-encodeZchars :: ZChars -> ZString
-encodeZchars zchars = ZString $ BL.toStrict $ Data.Binary.encode zchars
 
 encodeZchars' :: ZChars -> Put
 encodeZchars' (ZChars [z1, z2, z3]) = do
@@ -87,6 +86,7 @@ hasStopBit w = w .&. 0x8000 == 0x8000
 addStopBit :: Word16 -> Word16
 addStopBit w = w .|. 0x8000
 
+
 unpackZchars :: Word16 -> (ZChar, ZChar, ZChar)
 unpackZchars w = (z1, z2, z3) where
   mask = 0x001f
@@ -98,3 +98,6 @@ unpackZchars w = (z1, z2, z3) where
 
 packZchars :: (ZChar, ZChar, ZChar) -> Word16
 packZchars (z1, z2, z3) = (fromIntegral z3) .|. ((fromIntegral z2) `shift` 5) .|. ((fromIntegral z1) `shift` 10)
+
+zcharsLen :: ZChars -> Int
+zcharsLen (ZChars zchars) = length zchars

@@ -25,11 +25,31 @@ main = hspec $ do
                        in
                          (packZchars . unpackZchars) x' == x'
 
-    it "Any sequence of zchars will roundtrip through ZString" $
-      property $ \x -> let z = traceShowId $ zcharsToZstr x
-                           x' = traceShowId $ zstrToZchars z
+    it "A single ZChar will encode to 2 bytes" $
+      property $ \x -> let zchars = ZChars [x]
+                           ZString bs = zcharsToZstr zchars
                        in
-                         x == x'
+                         B.length bs == 2
+
+    it "Any non-empty ZChars encode to a bytestring ending with a stop bit" $
+      property $ \x -> zcharsLen x > 0 ==> let ZString bs = zcharsToZstr x
+                                               blen = B.length bs
+                                               b1 = B.index bs (blen - 2)
+                                               b2 = B.index bs (blen - 1)
+
+                                               w :: Word16
+                                               w = (fromIntegral b1) `shift` 8 .|. (fromIntegral b2)
+                                            in
+                                              hasStopBit w
+
+    it "Any sequence of zchars will roundtrip through ZString, possibly with ending padding" $
+      property $ \x -> let z = zcharsToZstr x
+                           x' = zstrToZchars z
+                           paddingChar = 5
+                           removePadding (ZChars zchars) =
+                             ZChars $ reverse $ dropWhile ((==) paddingChar) $ reverse zchars
+                       in
+                         removePadding x == removePadding x'
 
   describe "ZString" $ do
     it "Any even bytestring will decode to something" $
@@ -46,9 +66,10 @@ main = hspec $ do
 
 -- Quickcheck instances
 
+
 instance Arbitrary ZChars where
   arbitrary = do
     let genZchar = elements [0..31]
     len <- arbitrary
     ZChars <$> vectorOf len genZchar
-  shrink (ZChars zs) = [ZChars $ init zs]
+  -- shrink (ZChars zs) = [ZChars $ init zs]
