@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
 import Test.QuickCheck.Instances
@@ -9,8 +11,8 @@ import qualified Data.ByteString as B
 
 import Language.ZMachine.Types
 import Language.ZMachine.ZSCII.ZChars
+import Language.ZMachine.ZSCII.Parsec
 
-import Debug.Trace
 
 main :: IO ()
 main = hspec $ do
@@ -59,6 +61,8 @@ main = hspec $ do
                            0 -> zchars == []
                            1 -> zchars == []
                            _ -> length zchars > 0
+    it "A padding word is ignored" $ do
+      decodeZString 1 Nothing (zcharsToZstr [5, 5, 5]) `shouldBe` (ZsciiString "")
 
 
     -- TODO : test stop-bit logic

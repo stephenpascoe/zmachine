@@ -13,7 +13,6 @@ import Text.Parsec.Combinator
 import Language.ZMachine.Types
 import Language.ZMachine.ZSCII.ZChars
 
-
 data Alphabet = Alpha0 | Alpha1 | Alpha2
 
 type ZsciiParsec = Parsec [ZChar] Alphabet
