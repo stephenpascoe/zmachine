@@ -24,6 +24,7 @@ dependencies:
 - binary >= 0.8.3.0 && < 0.9
 - bytestring
 - text
+- text-latin1
 - vector
 - formatting
 - pretty-hex
