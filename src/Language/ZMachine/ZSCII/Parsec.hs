@@ -10,6 +10,7 @@ import Data.Vector ((!?))
 import Text.Parsec.Prim
 import Text.Parsec.Combinator
 import Data.Maybe
+import Data.Foldable
 
 import Language.ZMachine.Types
 import Language.ZMachine.ZSCII.ZChars
@@ -38,6 +39,15 @@ decodeZString :: Version                 -- ^ ZMachine version
 decodeZString version aTable zstr = zcharsToZscii version aTable (zstrToZchars zstr)
 
 
+data Token = ZCharToken Word8 | AbrevToken ZsciiString | EmptyToken
+
+foldTokens :: [Token] -> ZsciiString
+foldTokens toks = ZsciiString $ foldl' f "" toks where
+  f :: B.ByteString -> Token -> B.ByteString
+  f acc EmptyToken = acc
+  f acc (AbrevToken (ZsciiString abrev)) = B.append acc abrev
+  f acc (ZCharToken zchar) = B.snoc acc zchar
+
 zcharsToZscii :: Version -> Maybe AbbreviationTable -> [ZChar] -> ZsciiString
 zcharsToZscii version aTable zchars =
   let alphabetTable = getAlphabetTable version
@@ -46,8 +56,9 @@ zcharsToZscii version aTable zchars =
       pureChar :: Char -> ZsciiParsec Word8
       pureChar = pure . fromIntegral . fromEnum
 
-      parseZstring :: ZsciiParsec B.ByteString
-      parseZstring = B.pack . catMaybes <$> many element
+      -- TODO : deal with Token
+      parseZstring :: ZsciiParsec ZsciiString
+      parseZstring = foldTokens <$> many element
 
       element = normal <|> special
 
@@ -78,12 +89,12 @@ zcharsToZscii version aTable zchars =
                                   Alpha2 -> Alpha1
 
       shiftUpOnce = do shiftUp
-                       e <- element <|> pure Nothing
+                       e <- element <|> pure EmptyToken
                        shiftDown
                        return e
 
       shiftDownOnce = do shiftDown
-                         e <- element <|> pure Nothing
+                         e <- element <|> pure EmptyToken
                          shiftUp
                          return e
 
@@ -92,37 +103,36 @@ zcharsToZscii version aTable zchars =
 
       specialV12 = do z <- specialChar
                       case z of
-                        0 -> Just <$> pureChar ' '
-                        1 -> if version == 1 then Just <$> pureChar '\n'
-                             else Just <$> abbrev 1
+                        0 -> ZCharToken <$> pureChar ' '
+                        1 -> if version == 1 then ZCharToken <$> pureChar '\n'
+                             else AbrevToken <$> abbrev 1
                         2 -> shiftUpOnce
                         3 -> shiftDownOnce
-                        -- TODO : 4/5 can occur at end of input, therefore element is optional
-                        4 -> shiftDown *> pure Nothing
-                        5 -> shiftUp *> pure Nothing
-                        6 -> Just <$> pureChar '@' -- error "char 6" -- handle char 6 in A2
+                        4 -> shiftDown *> pure EmptyToken
+                        5 -> shiftUp *> pure EmptyToken
+                        6 -> ZCharToken <$> pureChar '@' -- error "char 6" -- handle char 6 in A2
                         _ -> error "Not a special character"
 
       specialV3 = do z <- specialChar
                      case z of
-                       0 -> Just <$> pureChar ' '
-                       1 -> Just <$> abbrev 1
-                       2 -> Just <$> abbrev 2
-                       3 -> Just <$> abbrev 3
+                       0 -> ZCharToken <$> pureChar ' '
+                       1 -> AbrevToken <$> abbrev 1
+                       2 -> AbrevToken <$> abbrev 2
+                       3 -> AbrevToken <$> abbrev 3
                        4 -> shiftUpOnce
                        5 -> shiftDownOnce
-                       6 -> Just <$> pureChar '@' -- error "char 6" -- handle char 6 in A2
+                       6 -> ZCharToken <$> pureChar '@' -- error "char 6" -- handle char 6 in A2
                        _ -> error "Not a special character"
 
       -- Normal character parser
       normal = do z <- normalChar
                   alphabet <- getState
-                  return $ Just (B.index (getAlphabetTable version alphabet) (fromIntegral (z - 6)))
+                  return $ ZCharToken (B.index (getAlphabetTable version alphabet) (fromIntegral (z - 6)))
 
       -- Abbreviation parser
       -- TODO : Need to return ByteString
-      abbrev :: Integer -> ZsciiParsec Word8
-      abbrev _ = error "No abbreviation parsing"
+      abbrev :: Integer -> ZsciiParsec ZsciiString
+      abbrev _ = pure $ ZsciiString "<ABREV>"
 {-
       abbrev x = do z <- anyToken
                     return $ getAbbreviation aTable x z
@@ -130,7 +140,7 @@ zcharsToZscii version aTable zchars =
   in
     case runParser parseZstring init "ZString decoder" zchars of
       Left e -> error $ show e
-      Right bs' -> ZsciiString bs'
+      Right zscii -> zscii
 
 
 
