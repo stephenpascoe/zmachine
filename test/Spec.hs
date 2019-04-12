@@ -1,12 +1,18 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
 import Test.QuickCheck.Instances
 
 import Data.Bits
+import Data.Word
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as B
 
-import Language.ZMachine.ZSCII
+import Language.ZMachine.Types
+import Language.ZMachine.ZSCII.ZChars
+import Language.ZMachine.ZSCII.Parsec
+
 
 main :: IO ()
 main = hspec $ do
@@ -21,21 +27,48 @@ main = hspec $ do
                        in
                          (packZchars . unpackZchars) x' == x'
 
+    it "A single ZChar will encode to 2 bytes" $
+      property $ \zchar -> let ZString bs = zcharsToZstr [zchar]
+                           in
+                             B.length bs == 2
+
+    it "Any non-empty ZChars encode to a bytestring ending with a stop bit" $
+      forAll genZChars $ \x -> length x > 0 ==> let ZString bs = zcharsToZstr x
+                                                    blen = B.length bs
+                                                    b1 = B.index bs (blen - 2)
+                                                    b2 = B.index bs (blen - 1)
+
+                                                    w :: Word16
+                                                    w = (fromIntegral b1) `shift` 8 .|. (fromIntegral b2)
+                                                in
+                                                  hasStopBit w
+
+    it "Any sequence of zchars will roundtrip through ZString, possibly with ending padding" $
+      forAll genZChars $ \x -> let z = zcharsToZstr x
+                                   x' = zstrToZchars z
+                                   paddingChar = 5
+                                   removePadding zchars =
+                                     reverse $ dropWhile ((==) paddingChar) $ reverse zchars
+                               in
+                                 removePadding x == removePadding x'
+
   describe "ZString" $ do
-    it "Any bytestring will decode to something" $
-      property $ \x -> let (ZChars zchars) = decodeZchars (ZString x)
+    it "Any even bytestring will decode to something" $
+      property $ \x -> let zchars = zstrToZchars (ZString x)
                        in
                          -- Ignores any trailing odd bytes
                          case B.length x of
                            0 -> zchars == []
                            1 -> zchars == []
                            _ -> length zchars > 0
+    it "A padding word is ignored" $ do
+      decodeZString 1 Nothing (zcharsToZstr [5, 5, 5]) `shouldBe` (ZsciiString "")
+
 
     -- TODO : test stop-bit logic
 
--- Quickcheck instances
 
-instance Arbitrary ZChars where
-  arbitrary = do
-    len <- arbitrary
-    ZChars <$> vector len
+-- Quickcheck generators
+genZChars :: Gen [ZChar]
+genZChars = do len <- arbitrary
+               vectorOf len (elements [0..31])

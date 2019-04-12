@@ -34,7 +34,7 @@ dictionary h = let header = M.getHeader h
 
 
 -- TODO : Version into type module
-decodeDictionary :: Int8 -> Maybe Z.AbbreviationTable -> Get Dictionary
+decodeDictionary :: Int8 -> Maybe AbbreviationTable -> Get Dictionary
 decodeDictionary version aTable = do
   dHeader <- decodeDictionaryHeader
   rawEntries <- decodeWordEntries version dHeader

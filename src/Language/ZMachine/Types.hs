@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Language.ZMachine.Types
   ( Header(..)
@@ -5,7 +6,6 @@ module Language.ZMachine.Types
   , Dictionary(..)
   , ZString(..)
   , ZsciiString(..)
-  , ZChars(..)
   , Zscii
   , ZChar
   , AbbreviationTable
@@ -16,8 +16,8 @@ import qualified Data.ByteString as B
 import Data.Word
 import Data.Int
 import Data.Binary
+import Data.Foldable
 import qualified Data.Vector as V
-
 
 type ByteAddress = Word16
 type Colour = Word8
@@ -92,8 +92,8 @@ type Zscii = Word8
 type ZChar = Word8
 
 -- | A ByteString representing ZString encoded characters
-newtype ZString = ZString { unZString :: B.ByteString } deriving Show
+newtype ZString = ZString { unZString :: B.ByteString } deriving (Show, Eq)
+
+
 -- | A ByteString representing a decoded ZString into a squence of Zscii charaters
-newtype ZsciiString = ZsciiString { unZsciiString :: B.ByteString } deriving Show
--- | A sequence of ZChars
-newtype ZChars = ZChars [ZChar]
+newtype ZsciiString = ZsciiString { unZsciiString :: B.ByteString } deriving (Show, Eq)
