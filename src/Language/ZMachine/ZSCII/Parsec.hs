@@ -8,8 +8,6 @@ import qualified Data.ByteString as B
 import Data.Word
 import Data.Vector ((!?))
 import Text.Parsec.Prim
-import Text.Parsec.Combinator
-import Data.Maybe
 import Data.Foldable
 import Text.Ascii
 import Data.Bits
@@ -40,6 +38,7 @@ decodeZString :: Version                 -- ^ ZMachine version
               -> ZsciiString             -- ^ Resulting ZsciiString
 decodeZString version aTable zstr = zcharsToZscii version aTable (zstrToZchars zstr)
 
+-- | Token is used inside the Zstring parser to handle shift events and abreviations
 data Token = ZCharToken Word8 | AbrevToken ZsciiString | EmptyToken
 
 foldTokens :: [Token] -> ZsciiString
@@ -51,10 +50,7 @@ foldTokens toks = ZsciiString $ foldl' f "" toks where
 
 zcharsToZscii :: Version -> Maybe AbbreviationTable -> [ZChar] -> ZsciiString
 zcharsToZscii version aTable zchars =
-  let alphabetTable = getAlphabetTable version
-      init = Alpha0
-
-      parseZstring :: ZsciiParsec ZsciiString
+  let parseZstring :: ZsciiParsec ZsciiString
       parseZstring = foldTokens <$> many element
 
       element = normal <|> special
@@ -69,9 +65,6 @@ zcharsToZscii version aTable zchars =
       specialChar = satisfy (\z -> z < 6)
       normalChar = satisfy (\z -> z >= 6 && z < 32)
       anyChar = satisfy (const True)
-
-      -- Many combinators return Maybe a so we can change state without emmiting chars and
-      -- allowing us to handle padding at the end of a string.
 
       -- Alphabet shifting
       shiftUp = do a <- getState
@@ -103,7 +96,7 @@ zcharsToZscii version aTable zchars =
                       case z of
                         0 -> pure $ ZCharToken (ascii ' ')
                         1 -> if version == 1 then pure $ ZCharToken (ascii '\n')
-                             else AbrevToken <$> abbrev 1
+                             else abbrev 1
                         2 -> shiftUpOnce
                         3 -> shiftDownOnce
                         4 -> shiftDown *> pure EmptyToken
@@ -114,9 +107,9 @@ zcharsToZscii version aTable zchars =
       specialV3 = do z <- specialChar
                      case z of
                        0 -> pure $ ZCharToken (ascii ' ')
-                       1 -> AbrevToken <$> abbrev 1
-                       2 -> AbrevToken <$> abbrev 2
-                       3 -> AbrevToken <$> abbrev 3
+                       1 -> abbrev 1
+                       2 -> abbrev 2
+                       3 -> abbrev 3
                        4 -> shiftUpOnce
                        5 -> shiftDownOnce
 
@@ -145,22 +138,21 @@ zcharsToZscii version aTable zchars =
       restOfInput = many anyChar *> pure EmptyToken
 
       -- Abbreviation parser
-      abbrev :: Integer -> ZsciiParsec ZsciiString
-      abbrev _ = pure $ ZsciiString "<ABREV>"
-{-
-      abbrev x = do z <- anyToken
+      abbrev :: Int -> ZsciiParsec Token
+      abbrev x = do z <- anyChar
                     return $ getAbbreviation aTable x z
--}
   in
-    case runParser parseZstring init "ZString decoder" zchars of
+    case runParser parseZstring Alpha0 "ZString decoder" zchars of
       Left e -> error $ show e
       Right zscii -> zscii
 
 
 
 -- TODO : Replace error with exception monad
-getAbbreviation :: Maybe AbbreviationTable -> Int -> ZChar -> ZsciiString
+getAbbreviation :: Maybe AbbreviationTable -> Int -> ZChar -> Token
 getAbbreviation Nothing _ _ = error "No abbreviations available"
+-- TODO : When we see some abrevations, implement this
+
 getAbbreviation (Just t) a b = case t !? (fromIntegral (a * 32) + fromIntegral b) of
                                  Nothing -> error "Abbreviation index out of range"
-                                 Just x -> x
+                                 Just x -> AbrevToken x

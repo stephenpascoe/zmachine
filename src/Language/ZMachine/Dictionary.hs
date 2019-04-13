@@ -11,7 +11,6 @@ module Language.ZMachine.Dictionary
   ) where
 
 import Data.Binary.Get
-import qualified Data.ByteString as B
 import Data.Int
 
 import qualified Data.Text.Lazy as TL
@@ -33,8 +32,7 @@ dictionary h = let header = M.getHeader h
                  runGet (decodeDictionary version aTable) (M.streamStoryBytes h (fromIntegral dictOffset))
 
 
--- TODO : Version into type module
-decodeDictionary :: Int8 -> Maybe AbbreviationTable -> Get Dictionary
+decodeDictionary :: Version -> Maybe AbbreviationTable -> Get Dictionary
 decodeDictionary version aTable = do
   dHeader <- decodeDictionaryHeader
   rawEntries <- decodeWordEntries version dHeader
@@ -52,8 +50,7 @@ decodeDictionaryHeader = do n <- getWord8
                                                       }
 
 
--- TODO : use higher-order function instead of recursion
-decodeWordEntries :: Int8 -> DictionaryHeader -> Get [ZString]
+decodeWordEntries :: Version -> DictionaryHeader -> Get [ZString]
 decodeWordEntries v h = let nmax = numEntries h
                             zlen = if v < 4 then 4 else 6
                             f n | n >= nmax = return []
@@ -66,5 +63,6 @@ decodeWordEntries v h = let nmax = numEntries h
 
 showDictionary :: Dictionary -> TL.Text
 showDictionary dict = TB.toLazyText $ mconcat entryBs where
+  buildEntry :: (Integer, ZsciiString) -> TB.Builder
   buildEntry (i, zseq) = F.bprint ("[" % F.int % "] " % F.stext % "\n") i (Z.zseqToText zseq)
   entryBs = map buildEntry $ zip [0..] (entries dict)

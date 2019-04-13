@@ -2,9 +2,7 @@ module Main where
 
 import qualified Language.ZMachine.Memory as M
 import qualified Language.ZMachine.Dictionary as D
-import qualified Data.ByteString.Lazy as BL
 import System.Environment (getArgs)
-import Data.Binary.Get (runGet)
 import qualified Data.Text.Lazy.IO as TIO
 
 main :: IO ()
