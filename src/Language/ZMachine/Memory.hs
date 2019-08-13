@@ -31,7 +31,7 @@ getStoryBytes :: Handle
          -> Int -- ^ Offset
          -> Int -- ^ Length
          -> B.ByteString
-getStoryBytes h offset length = B.take length $ B.drop offset (storyBytes h)
+getStoryBytes h offset n = B.take n $ B.drop offset (storyBytes h)
 
 streamStoryBytes :: Handle
                -> Int -- ^ Offset
@@ -97,24 +97,24 @@ parseHeader = do
 
 -- TODO : Display Hex
 showHeader :: Header -> T.Text
-showHeader header = textDisplay $ mconcat [ bprint "Z-code version" zVersion
-                                          , bprint "Interpreter flags" flags1
-                                          , bprint "Release number" releaseNumber
-                                          , bprint "Size of resident memory" baseHighMemory
-                                          , bprint "Start PC" initPC
-                                          , bprint "Dictionary address" dictionaryOffset
-                                          , bprint "Object table address" objectTable
-                                          , bprint "Global variables address" variablesTable
-                                          , bprint "Size of dynamic memory" baseStaticMemory
-                                          , bprint "Game flags" flags2
-                                          , bprint "Serial number" ((T.decodeUtf8With T.lenientDecode) . serialCode)
-                                          , bprint "Abbreviations address" abbreviationTableOffset
-                                          , bprint "File size" fileLength
-                                          , bprint "Checksum" checksum
+showHeader header = textDisplay $ mconcat [ entry "Z-code version" zVersion
+                                          , entry "Interpreter flags" flags1
+                                          , entry "Release number" releaseNumber
+                                          , entry "Size of resident memory" baseHighMemory
+                                          , entry "Start PC" initPC
+                                          , entry "Dictionary address" dictionaryOffset
+                                          , entry "Object table address" objectTable
+                                          , entry "Global variables address" variablesTable
+                                          , entry "Size of dynamic memory" baseStaticMemory
+                                          , entry "Game flags" flags2
+                                          , entry "Serial number" ((T.decodeUtf8With T.lenientDecode) . serialCode)
+                                          , entry "Abbreviations address" abbreviationTableOffset
+                                          , entry "File size" fileLength
+                                          , entry "Checksum" checksum
                                             -- TODO : Terminating keys
                                             -- TODO : Header extension
-                                          , bprint "Inform Version" interpreterNumber
+                                          , entry "Inform Version" interpreterNumber
                                           ]
   where
-    bprint :: Display a => Text -> (Header -> a) -> Utf8Builder
-    bprint fieldName accessor =  (display fieldName) <> ": " <> (display (accessor header)) <> "\n"
+    entry :: Display a => Text -> (Header -> a) -> Utf8Builder
+    entry fieldName accessor =  (display fieldName) <> ": " <> (display (accessor header)) <> "\n"

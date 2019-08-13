@@ -10,7 +10,6 @@ module Language.ZMachine.Dictionary
 import RIO
 
 import Data.Binary.Get
-import Data.Int
 
 import qualified Language.ZMachine.Memory as M
 import qualified Language.ZMachine.ZSCII as Z
