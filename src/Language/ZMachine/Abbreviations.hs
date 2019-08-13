@@ -1,11 +1,12 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Language.ZMachine.Abbreviations
   ( abbreviations
   ) where
 
+import RIO
+
 import Data.Binary.Get
 import Data.Word
+import Data.List
 
 import qualified Language.ZMachine.Memory as M
 import Language.ZMachine.Types

@@ -1,12 +1,11 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Language.ZMachine.ZSCII
   ( decodeZString
   , zseqToText
   ) where
 
+import RIO
 import qualified Data.Text.Encoding as TE
-import qualified Data.Text as T
+import qualified RIO.Text as T
 
 import Language.ZMachine.ZSCII.Parsec
 import Language.ZMachine.Types

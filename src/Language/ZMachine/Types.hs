@@ -12,12 +12,9 @@ module Language.ZMachine.Types
   , Version
   ) where
 
-import qualified Data.ByteString as B
-import Data.Word
-import Data.Int
-import Data.Binary
-import Data.Foldable
-import qualified Data.Vector as V
+import RIO
+import qualified RIO.ByteString as B
+import qualified RIO.Vector.Boxed as V
 
 type ByteAddress = Word16
 type Colour = Word8

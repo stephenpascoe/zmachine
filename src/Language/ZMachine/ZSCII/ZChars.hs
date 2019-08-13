@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 {- ZChars encode 3 chars into 2 bytes.
 
 -- Ending a string early
@@ -21,13 +19,13 @@ module Language.ZMachine.ZSCII.ZChars
  , hasStopBit
  ) where
 
-import qualified Data.ByteString.Lazy as BL
-import Data.Word
+import RIO
+
+import qualified RIO.ByteString.Lazy as BL
 import Data.Bits
 import Data.Binary.Put
 import Data.Binary.Get
 import Data.Binary
-import Control.Applicative
 
 import Language.ZMachine.Types
 

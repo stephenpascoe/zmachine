@@ -1,14 +1,12 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Language.ZMachine.ZSCII.Parsec
  ( decodeZString
  ) where
 
-import qualified Data.ByteString as B
-import Data.Word
-import Data.Vector ((!?))
+import RIO hiding (many, try, (<|>))
+
+import qualified RIO.ByteString as B
+import RIO.Vector.Boxed ((!?))
 import Text.Parsec.Prim
-import Data.Foldable
 import Text.Ascii
 import Data.Bits
 

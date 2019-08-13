@@ -1,6 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NamedFieldPuns #-}
-
 module Language.ZMachine.Dictionary
   ( dictionary
   , DictionaryHeader(..)
@@ -10,13 +7,10 @@ module Language.ZMachine.Dictionary
   , decodeWordEntries
   ) where
 
+import RIO
+
 import Data.Binary.Get
 import Data.Int
-
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Builder as TB
-import qualified Formatting as F
-import Formatting ((%))
 
 import qualified Language.ZMachine.Memory as M
 import qualified Language.ZMachine.ZSCII as Z
@@ -61,8 +55,8 @@ decodeWordEntries v h = let nmax = numEntries h
                         in f 0
 
 
-showDictionary :: Dictionary -> TL.Text
-showDictionary dict = TB.toLazyText $ mconcat entryBs where
-  buildEntry :: (Integer, ZsciiString) -> TB.Builder
-  buildEntry (i, zseq) = F.bprint ("[" % F.int % "] " % F.stext % "\n") i (Z.zseqToText zseq)
+showDictionary :: Dictionary -> Text
+showDictionary dict = textDisplay $ mconcat entryBs where
+  buildEntry :: (Integer, ZsciiString) -> Utf8Builder
+  buildEntry (i, zseq) = "[" <> (display i) <> "] " <> (display (Z.zseqToText zseq)) <> "\n"
   entryBs = map buildEntry $ zip [0..] (entries dict)

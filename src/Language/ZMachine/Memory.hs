@@ -1,8 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Language.ZMachine.Memory
   ( Handle
   , new
@@ -13,23 +8,16 @@ module Language.ZMachine.Memory
   , showHeader
   ) where
 
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Builder as TB
-import qualified Data.Text.Encoding as TE
-import qualified Formatting as F
-import Formatting ((%), (%.))
+import RIO hiding (Handle)
+
+import qualified RIO.ByteString as B
+import qualified RIO.ByteString.Lazy as BL
+import qualified RIO.Text as T
 import Data.Binary.Get
-import Data.Word
-import Data.Int
 
 import Language.ZMachine.Types
 
 newtype Handle = Handle { storyBytes :: B.ByteString }
-
-
-
 
 
 new :: FilePath -> IO Handle
@@ -107,26 +95,26 @@ parseHeader = do
 
   return $ Header { .. }
 
-showHeader :: Header -> TL.Text
-showHeader header = TB.toLazyText $ mconcat [ bprint "Z-code version" zVersion F.int
-                                            , bprint "Interpreter flags" flags1 F.int
-                                            , bprint "Release number" releaseNumber F.int
-                                            , bprint "Size of resident memory" baseHighMemory F.hex
-                                            , bprint "Start PC" initPC F.hex
-                                            , bprint "Dictionary address" dictionaryOffset F.hex
-                                            , bprint "Object table address" objectTable F.hex
-                                            , bprint "Global variables address" variablesTable F.hex
-                                            , bprint "Size of dynamic memory" baseStaticMemory F.hex
-                                            , bprint "Game flags" flags2 F.int
-                                            , F.bprint (field F.text) "Serial number" (TL.fromStrict . TE.decodeUtf8 $
-                                                                                       serialCode header)
-                                            , bprint "Abbreviations address" abbreviationTableOffset F.hex
-                                            , bprint "File size" fileLength F.hex
-                                            , bprint "Checksum" checksum F.hex
+-- TODO : Display Hex
+showHeader :: Header -> T.Text
+showHeader header = textDisplay $ mconcat [ bprint "Z-code version" zVersion
+                                          , bprint "Interpreter flags" flags1
+                                          , bprint "Release number" releaseNumber
+                                          , bprint "Size of resident memory" baseHighMemory
+                                          , bprint "Start PC" initPC
+                                          , bprint "Dictionary address" dictionaryOffset
+                                          , bprint "Object table address" objectTable
+                                          , bprint "Global variables address" variablesTable
+                                          , bprint "Size of dynamic memory" baseStaticMemory
+                                          , bprint "Game flags" flags2
+                                          , bprint "Serial number" ((T.decodeUtf8With T.lenientDecode) . serialCode)
+                                          , bprint "Abbreviations address" abbreviationTableOffset
+                                          , bprint "File size" fileLength
+                                          , bprint "Checksum" checksum
                                             -- TODO : Terminating keys
                                             -- TODO : Header extension
-                                            , bprint "Inform Version" interpreterNumber F.int
-                                            ]
+                                          , bprint "Inform Version" interpreterNumber
+                                          ]
   where
-    field typ = (F.right 26 ' ' %. F.text % ": ") % typ % "\n"
-    bprint fieldName accessor fieldType   = F.bprint (field fieldType) fieldName (accessor header)
+    bprint :: Display a => Text -> (Header -> a) -> Utf8Builder
+    bprint fieldName accessor =  (display fieldName) <> ": " <> (display (accessor header)) <> "\n"
