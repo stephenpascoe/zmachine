@@ -41,7 +41,7 @@ library:
     - -Wall
 
 executables:
-  zmachine-exe:
+  hzm:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
