@@ -1,13 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+import RIO
+
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
 import Test.QuickCheck.Instances
 
 import Data.Bits
 import Data.Word
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString as B
+import RIO.ByteString as B
+import RIO.List as L
 
 import Language.ZMachine.Types
 import Language.ZMachine.ZSCII.ZChars
@@ -33,22 +35,22 @@ main = hspec $ do
                              B.length bs == 2
 
     it "Any non-empty ZChars encode to a bytestring ending with a stop bit" $
-      forAll genZChars $ \x -> length x > 0 ==> let ZString bs = zcharsToZstr x
-                                                    blen = B.length bs
-                                                    b1 = B.index bs (blen - 2)
-                                                    b2 = B.index bs (blen - 1)
+      forAll genZChars $ \x -> L.length x > 0 ==> let ZString bs = zcharsToZstr x
+                                                      blen = B.length bs
+                                                      b1 = B.index bs (blen - 2)
+                                                      b2 = B.index bs (blen - 1)
 
-                                                    w :: Word16
-                                                    w = (fromIntegral b1) `shift` 8 .|. (fromIntegral b2)
-                                                in
-                                                  hasStopBit w
+                                                      w :: Word16
+                                                      w = (fromIntegral b1) `shift` 8 .|. (fromIntegral b2)
+                                                  in
+                                                    hasStopBit w
 
     it "Any sequence of zchars will roundtrip through ZString, possibly with ending padding" $
       forAll genZChars $ \x -> let z = zcharsToZstr x
                                    x' = zstrToZchars z
                                    paddingChar = 5
                                    removePadding zchars =
-                                     reverse $ dropWhile ((==) paddingChar) $ reverse zchars
+                                     L.reverse $ L.dropWhile ((==) paddingChar) $ L.reverse zchars
                                in
                                  removePadding x == removePadding x'
 
@@ -60,7 +62,7 @@ main = hspec $ do
                          case B.length x of
                            0 -> zchars == []
                            1 -> zchars == []
-                           _ -> length zchars > 0
+                           _ -> L.length zchars > 0
     it "A padding word is ignored" $ do
       decodeZString 1 Nothing (zcharsToZstr [5, 5, 5]) `shouldBe` (ZsciiString "")
 
