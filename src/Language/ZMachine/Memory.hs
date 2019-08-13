@@ -13,6 +13,7 @@ import RIO hiding (Handle)
 import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.Text as T
+import qualified Numeric as N
 import Data.Binary.Get
 
 import Language.ZMachine.Types
@@ -95,26 +96,32 @@ parseHeader = do
 
   return $ Header { .. }
 
--- TODO : Display Hex
+
 showHeader :: Header -> T.Text
-showHeader header = textDisplay $ mconcat [ entry "Z-code version" zVersion
-                                          , entry "Interpreter flags" flags1
-                                          , entry "Release number" releaseNumber
-                                          , entry "Size of resident memory" baseHighMemory
-                                          , entry "Start PC" initPC
-                                          , entry "Dictionary address" dictionaryOffset
-                                          , entry "Object table address" objectTable
-                                          , entry "Global variables address" variablesTable
-                                          , entry "Size of dynamic memory" baseStaticMemory
-                                          , entry "Game flags" flags2
-                                          , entry "Serial number" ((T.decodeUtf8With T.lenientDecode) . serialCode)
-                                          , entry "Abbreviations address" abbreviationTableOffset
-                                          , entry "File size" fileLength
-                                          , entry "Checksum" checksum
+showHeader header = textDisplay $ mconcat [ dEntry "Z-code version" zVersion
+                                          , dEntry "Interpreter flags" flags1
+                                          , dEntry "Release number" releaseNumber
+                                          , hexEntry "Size of resident memory" baseHighMemory
+                                          , hexEntry "Start PC" initPC
+                                          , hexEntry "Dictionary address" dictionaryOffset
+                                          , hexEntry "Object table address" objectTable
+                                          , hexEntry "Global variables address" variablesTable
+                                          , hexEntry "Size of dynamic memory" baseStaticMemory
+                                          , dEntry "Game flags" flags2
+                                          , dEntry "Serial number" ((T.decodeUtf8With T.lenientDecode) . serialCode)
+                                          , hexEntry "Abbreviations address" abbreviationTableOffset
+                                          , dEntry "File size" fileLength
+                                          , hexEntry "Checksum" checksum
                                             -- TODO : Terminating keys
                                             -- TODO : Header extension
-                                          , entry "Inform Version" interpreterNumber
+                                          , dEntry "Inform Version" interpreterNumber
                                           ]
   where
-    entry :: Display a => Text -> (Header -> a) -> Utf8Builder
-    entry fieldName accessor =  (display fieldName) <> ": " <> (display (accessor header)) <> "\n"
+    -- entry :: Display a => Text -> (Header -> a) -> Utf8Builder
+    -- entry fieldName accessor =  (display fieldName) <> ": " <> (display (accessor header)) <> "\n"
+    entry :: Display a => Text -> a -> Utf8Builder
+    entry name value = (display name) <> ": " <> (display value) <> "\n"
+    hexEntry :: Text -> (Header -> Word16) -> Utf8Builder
+    hexEntry name accessor = entry name (T.pack $ (N.showHex (accessor header)) "")
+    dEntry :: Display a => Text -> (Header -> a) -> Utf8Builder
+    dEntry name accessor = entry name (accessor header)
