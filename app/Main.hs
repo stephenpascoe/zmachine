@@ -11,12 +11,12 @@ import qualified RIO.ByteString as B
 import qualified RIO.Text as T
 
 main :: IO ()
-main = do
-  args <- getArgs
+main = runSimpleApp $ do
+  args <- liftIO $ getArgs
   let mStoryFile = L.headMaybe args
   case mStoryFile of
     Nothing -> B.putStr "No storyfile specified\n"
     Just storyFile -> do
-      storyH <- M.new storyFile
+      storyH <- liftIO $ M.new storyFile
       B.putStr . T.encodeUtf8 $ M.showHeader (M.getHeader storyH)
       B.putStr . T.encodeUtf8 $ D.showDictionary (D.dictionary storyH)
