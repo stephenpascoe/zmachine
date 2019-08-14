@@ -1,10 +1,5 @@
 module Language.ZMachine.Memory
-  ( Handle
-  , new
-  , close
-  , getHeader
-  , getStoryBytes
-  , streamStoryBytes
+  ( HasMemory(..)
   , showHeader
   ) where
 
@@ -17,30 +12,36 @@ import qualified Numeric as N
 import Data.Binary.Get
 
 import Language.ZMachine.Types
+import Language.ZMachine.App
 
-newtype Handle = Handle { storyBytes :: B.ByteString }
+-- newtype Handle = Handle { storyBytes :: B.ByteString }
 
-
+{-
 new :: FilePath -> IO Handle
 new path = do file <- BL.readFile path
               return $ Handle (BL.toStrict file)
 
 close :: Handle -> IO ()
 close _ = return ()
+-}
 
-getStoryBytes :: Handle
-         -> Int -- ^ Offset
-         -> Int -- ^ Length
-         -> B.ByteString
-getStoryBytes h offset n = B.take n $ B.drop offset (storyBytes h)
+-- HasMemory defines the interface to raw memory
 
-streamStoryBytes :: Handle
-               -> Int -- ^ Offset
-               -> BL.ByteString
-streamStoryBytes h offset = BL.fromStrict $ B.drop offset (storyBytes h)
+class HasMemory env where
+  getHeader :: env -> Header
+  getBytes :: env
+           -> Int -- ^ Offset
+           -> Int -- ^ Length
+           -> B.ByteString
+  streamBytes :: env
+              -> Int -- ^ Offset
+              -> BL.ByteString
 
-getHeader :: Handle -> Header
-getHeader h = runGet parseHeader (BL.fromStrict $ storyBytes h)
+instance HasMemory App where
+  getHeader env = runGet parseHeader (BL.fromStrict $ story env)
+  getBytes env offset n = B.take n $ B.drop offset (story env)
+  streamBytes env offset = BL.fromStrict $ B.drop offset (story env)
+
 
 parseHeader :: Get Header
 parseHeader = do
@@ -97,25 +98,26 @@ parseHeader = do
   return $ Header { .. }
 
 
-showHeader :: Header -> T.Text
-showHeader header = textDisplay $ mconcat [ dEntry "Z-code version" zVersion
-                                          , dEntry "Interpreter flags" flags1
-                                          , dEntry "Release number" releaseNumber
-                                          , hexEntry "Size of resident memory" baseHighMemory
-                                          , hexEntry "Start PC" initPC
-                                          , hexEntry "Dictionary address" dictionaryOffset
-                                          , hexEntry "Object table address" objectTable
-                                          , hexEntry "Global variables address" variablesTable
-                                          , hexEntry "Size of dynamic memory" baseStaticMemory
-                                          , dEntry "Game flags" flags2
-                                          , dEntry "Serial number" ((T.decodeUtf8With T.lenientDecode) . serialCode)
-                                          , hexEntry "Abbreviations address" abbreviationTableOffset
-                                          , dEntry "File size" fileLength
-                                          , hexEntry "Checksum" checksum
-                                            -- TODO : Terminating keys
-                                            -- TODO : Header extension
-                                          , dEntry "Inform Version" interpreterNumber
-                                          ]
+-- TODO : Convert to Display instance
+showHeader :: Header -> Utf8Builder
+showHeader header = mconcat [ dEntry "Z-code version" zVersion
+                            , dEntry "Interpreter flags" flags1
+                            , dEntry "Release number" releaseNumber
+                            , hexEntry "Size of resident memory" baseHighMemory
+                            , hexEntry "Start PC" initPC
+                            , hexEntry "Dictionary address" dictionaryOffset
+                            , hexEntry "Object table address" objectTable
+                            , hexEntry "Global variables address" variablesTable
+                            , hexEntry "Size of dynamic memory" baseStaticMemory
+                            , dEntry "Game flags" flags2
+                            , dEntry "Serial number" ((T.decodeUtf8With T.lenientDecode) . serialCode)
+                            , hexEntry "Abbreviations address" abbreviationTableOffset
+                            , dEntry "File size" fileLength
+                            , hexEntry "Checksum" checksum
+                              -- TODO : Terminating keys
+                              -- TODO : Header extension
+                            , dEntry "Inform Version" interpreterNumber
+                            ]
   where
     -- entry :: Display a => Text -> (Header -> a) -> Utf8Builder
     -- entry fieldName accessor =  (display fieldName) <> ": " <> (display (accessor header)) <> "\n"

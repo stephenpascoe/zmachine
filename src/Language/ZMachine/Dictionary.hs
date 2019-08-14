@@ -16,13 +16,13 @@ import qualified Language.ZMachine.ZSCII as Z
 import Language.ZMachine.Types
 
 
-dictionary :: M.Handle -> Dictionary
-dictionary h = let header = M.getHeader h
-                   dictOffset = dictionaryOffset header
-                   version = zVersion header
-                   aTable = Nothing
+dictionary :: M.HasMemory env => env -> Dictionary
+dictionary env = let header = M.getHeader env
+                     dictOffset = dictionaryOffset header
+                     version = zVersion header
+                     aTable = Nothing
                in
-                 runGet (decodeDictionary version aTable) (M.streamStoryBytes h (fromIntegral dictOffset))
+                 runGet (decodeDictionary version aTable) (M.streamBytes env (fromIntegral dictOffset))
 
 
 decodeDictionary :: Version -> Maybe AbbreviationTable -> Get Dictionary
@@ -54,8 +54,8 @@ decodeWordEntries v h = let nmax = numEntries h
                         in f 0
 
 
-showDictionary :: Dictionary -> Text
-showDictionary dict = textDisplay $ mconcat entryBs where
+showDictionary :: Dictionary -> Utf8Builder
+showDictionary dict = mconcat entryBs where
   buildEntry :: (Integer, ZsciiString) -> Utf8Builder
   buildEntry (i, zseq) = "[" <> (display i) <> "] " <> (display (Z.zseqToText zseq)) <> "\n"
   entryBs = map buildEntry $ zip [0..] (entries dict)

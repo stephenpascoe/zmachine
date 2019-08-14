@@ -9,7 +9,6 @@ Since the end-bit only comes up once every three Z-characters, a string may have
 a sequence of (for example) 4's would work equally well.
 
 -}
-
 module Language.ZMachine.ZSCII.ZChars
  ( zstrToZchars
  , zcharsToZstr

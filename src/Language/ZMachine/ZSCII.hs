@@ -3,7 +3,6 @@ module Language.ZMachine.ZSCII
   , zseqToText
   ) where
 
-import RIO
 import qualified Data.Text.Encoding as TE
 import qualified RIO.Text as T
 

@@ -5,17 +5,16 @@ module Language.ZMachine.Abbreviations
 import RIO
 
 import Data.Binary.Get
-import Data.Word
 import Data.List
 
 import qualified Language.ZMachine.Memory as M
 import Language.ZMachine.Types
 
-abbreviations :: M.Handle -> AbbreviationTable
-abbreviations h = let header = M.getHeader h
-                      tableOffset = abbreviationTableOffset header
-                      tableLength = if zVersion header < 3 then 32 else 96
-                      tableOffsets = runGet (decodeTableOffsets tableLength) (M.streamStoryBytes h (fromIntegral tableOffset))
+abbreviations :: M.HasMemory env => env -> AbbreviationTable
+abbreviations env = let header = M.getHeader env
+                        tableOffset = abbreviationTableOffset header
+                        tableLength = if zVersion header < 3 then 32 else 96
+                        tableOffsets = runGet (decodeTableOffsets tableLength) (M.streamBytes env (fromIntegral tableOffset))
                   in
 
                     -- TODO : Read ZString from each offset
