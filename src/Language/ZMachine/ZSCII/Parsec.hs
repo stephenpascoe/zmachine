@@ -151,6 +151,6 @@ getAbbreviation :: Maybe AbbreviationTable -> Int -> ZChar -> Token
 getAbbreviation Nothing _ _ = error "No abbreviations available"
 -- TODO : When we see some abrevations, implement this
 
-getAbbreviation (Just t) a b = case t !? (fromIntegral (a * 32) + fromIntegral b) of
+getAbbreviation (Just t) a b = case t !? ((a * 32) + fromIntegral b) of
                                  Nothing -> error "Abbreviation index out of range"
                                  Just x -> AbrevToken x

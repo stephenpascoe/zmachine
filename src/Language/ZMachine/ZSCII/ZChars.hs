@@ -28,10 +28,8 @@ import Data.Binary
 
 import Language.ZMachine.Types
 
-
-data Alphabet = Alpha0 | Alpha1 | Alpha2
-
-paddingChar = 5 :: ZChar
+paddingChar :: ZChar
+paddingChar = 5
 
 -- | Parse a ByteString to a stream of ZChars
 --   If there are an odd number of bytes in the bytestring the last byte will be discarded.
@@ -81,11 +79,11 @@ addStopBit w = w .|. 0x8000
 
 unpackZchars :: Word16 -> (ZChar, ZChar, ZChar)
 unpackZchars w = (z1, z2, z3) where
-  mask = 0x001f
+  mask' = 0x001f
   w' = w .&. 0x7fff
-  z1 = fromIntegral $ (w' `shift` (-10)) .&. mask
-  z2 = fromIntegral $ (w' `shift`  (-5)) .&. mask
-  z3 = fromIntegral $ w' .&. mask
+  z1 = fromIntegral $ (w' `shift` (-10)) .&. mask'
+  z2 = fromIntegral $ (w' `shift`  (-5)) .&. mask'
+  z3 = fromIntegral $ w' .&. mask'
 
 
 packZchars :: (ZChar, ZChar, ZChar) -> Word16
