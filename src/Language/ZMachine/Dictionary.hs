@@ -1,43 +1,46 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NamedFieldPuns #-}
-
 module Language.ZMachine.Dictionary
-  ( dictionary
-  , DictionaryHeader(..)
+  ( HasDictionary(..)
   , Dictionary(..)
-  , showDictionary
     --
   , decodeWordEntries
   ) where
 
-import Data.Binary.Get
-import Data.Int
+import RIO
 
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Builder as TB
-import qualified Formatting as F
-import Formatting ((%))
+import qualified RIO.Text as T
+import Data.Binary.Get
 
 import qualified Language.ZMachine.Memory as M
 import qualified Language.ZMachine.ZSCII as Z
+import Language.ZMachine.App (App)
 import Language.ZMachine.Types
 
 
-dictionary :: M.Handle -> Dictionary
-dictionary h = let header = M.getHeader h
-                   dictOffset = dictionaryOffset header
-                   version = zVersion header
-                   aTable = Nothing
-               in
-                 runGet (decodeDictionary version aTable) (M.streamStoryBytes h (fromIntegral dictOffset))
+data ZsciiException = ZsciiException T.Text deriving (Show, Typeable)
+instance Exception ZsciiException
+
+class HasDictionary env where
+  getDictionary :: M.HasMemory env => RIO env Dictionary
+
+instance HasDictionary App where
+  getDictionary = do header <- M.getHeader
+                     let dictOffset = dictionaryOffset header
+                         version = zVersion header
+                         aTable = Nothing
+                     stream <- M.streamBytes (fromIntegral dictOffset)
+                     case runGet (decodeDictionary version aTable) stream  of
+                       Left err -> throwIO $ ZsciiException err
+                       Right dict -> return dict
 
 
-decodeDictionary :: Version -> Maybe AbbreviationTable -> Get Dictionary
+decodeDictionary :: Version -> Maybe AbbreviationTable -> Get (Either T.Text Dictionary)
 decodeDictionary version aTable = do
   dHeader <- decodeDictionaryHeader
   rawEntries <- decodeWordEntries version dHeader
-  let entries = fmap (Z.decodeZString version aTable) rawEntries
-  return $ Dictionary dHeader entries
+  let eEntries = sequenceA $ fmap  (Z.decodeZString version aTable) rawEntries
+  return $ case eEntries of
+             Left err -> Left err
+             Right entries -> Right $ Dictionary dHeader entries
 
 decodeDictionaryHeader :: Get DictionaryHeader
 decodeDictionaryHeader = do n <- getWord8
@@ -61,8 +64,8 @@ decodeWordEntries v h = let nmax = numEntries h
                         in f 0
 
 
-showDictionary :: Dictionary -> TL.Text
-showDictionary dict = TB.toLazyText $ mconcat entryBs where
-  buildEntry :: (Integer, ZsciiString) -> TB.Builder
-  buildEntry (i, zseq) = F.bprint ("[" % F.int % "] " % F.stext % "\n") i (Z.zseqToText zseq)
-  entryBs = map buildEntry $ zip [0..] (entries dict)
+instance Display Dictionary where
+  display dict = mconcat entryBs where
+    buildEntry :: (Integer, ZsciiString) -> Utf8Builder
+    buildEntry (i, zseq) = "[" <> (display i) <> "] " <> (display (Z.zseqToText zseq)) <> "\n"
+    entryBs = map buildEntry $ zip [0..] (entries dict)

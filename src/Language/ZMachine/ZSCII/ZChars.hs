@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 {- ZChars encode 3 chars into 2 bytes.
 
 -- Ending a string early
@@ -11,7 +9,6 @@ Since the end-bit only comes up once every three Z-characters, a string may have
 a sequence of (for example) 4's would work equally well.
 
 -}
-
 module Language.ZMachine.ZSCII.ZChars
  ( zstrToZchars
  , zcharsToZstr
@@ -21,20 +18,18 @@ module Language.ZMachine.ZSCII.ZChars
  , hasStopBit
  ) where
 
-import qualified Data.ByteString.Lazy as BL
-import Data.Word
+import RIO
+
+import qualified RIO.ByteString.Lazy as BL
 import Data.Bits
 import Data.Binary.Put
 import Data.Binary.Get
 import Data.Binary
-import Control.Applicative
 
 import Language.ZMachine.Types
 
-
-data Alphabet = Alpha0 | Alpha1 | Alpha2
-
-paddingChar = 5 :: ZChar
+paddingChar :: ZChar
+paddingChar = 5
 
 -- | Parse a ByteString to a stream of ZChars
 --   If there are an odd number of bytes in the bytestring the last byte will be discarded.
@@ -84,11 +79,11 @@ addStopBit w = w .|. 0x8000
 
 unpackZchars :: Word16 -> (ZChar, ZChar, ZChar)
 unpackZchars w = (z1, z2, z3) where
-  mask = 0x001f
+  mask' = 0x001f
   w' = w .&. 0x7fff
-  z1 = fromIntegral $ (w' `shift` (-10)) .&. mask
-  z2 = fromIntegral $ (w' `shift`  (-5)) .&. mask
-  z3 = fromIntegral $ w' .&. mask
+  z1 = fromIntegral $ (w' `shift` (-10)) .&. mask'
+  z2 = fromIntegral $ (w' `shift`  (-5)) .&. mask'
+  z3 = fromIntegral $ w' .&. mask'
 
 
 packZchars :: (ZChar, ZChar, ZChar) -> Word16

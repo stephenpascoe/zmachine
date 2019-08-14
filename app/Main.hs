@@ -1,14 +1,33 @@
 module Main where
 
+import RIO
+
+import Language.ZMachine.App
 import qualified Language.ZMachine.Memory as M
 import qualified Language.ZMachine.Dictionary as D
 import System.Environment (getArgs)
-import qualified Data.Text.Lazy.IO as TIO
+
+import qualified RIO.List as L
+import qualified RIO.ByteString as B
+import qualified RIO.ByteString.Lazy as BL
+
 
 main :: IO ()
 main = do
-  args <- getArgs
-  let storyFile = head args
-  storyH <- M.new storyFile
-  TIO.putStrLn $ M.showHeader (M.getHeader storyH)
-  TIO.putStr $ D.showDictionary (D.dictionary storyH)
+  logOptions' <- logOptionsHandle stdout False
+  withLogFunc logOptions' $ \logFunc -> do
+    args <- liftIO $ getArgs
+    let mStoryFile = L.headMaybe args
+    case mStoryFile of
+      Nothing -> B.putStr "No story file specified\n"
+      Just storyPath -> do file <- BL.readFile storyPath
+                           let app = App { appLogger = logFunc
+                                         , story = BL.toStrict file
+                                         }
+                           runRIO app dump
+
+dump :: RIO App ()
+dump = do dict <- D.getDictionary
+          header <- M.getHeader
+          logInfo . display $ header
+          logInfo . display $ dict

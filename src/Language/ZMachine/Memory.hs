@@ -1,57 +1,47 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Language.ZMachine.Memory
-  ( Handle
-  , new
-  , close
-  , getHeader
-  , getStoryBytes
-  , streamStoryBytes
-  , showHeader
+  ( HasMemory(..)
   ) where
 
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Builder as TB
-import qualified Data.Text.Encoding as TE
-import qualified Formatting as F
-import Formatting ((%), (%.))
+import RIO hiding (Handle)
+
+import qualified RIO.ByteString as B
+import qualified RIO.ByteString.Lazy as BL
+import qualified RIO.Text as T
+import qualified Numeric as N
 import Data.Binary.Get
-import Data.Word
-import Data.Int
 
 import Language.ZMachine.Types
+import Language.ZMachine.App
 
-newtype Handle = Handle { storyBytes :: B.ByteString }
+-- newtype Handle = Handle { storyBytes :: B.ByteString }
 
-
-
-
-
+{-
 new :: FilePath -> IO Handle
 new path = do file <- BL.readFile path
               return $ Handle (BL.toStrict file)
 
 close :: Handle -> IO ()
 close _ = return ()
+-}
 
-getStoryBytes :: Handle
-         -> Int -- ^ Offset
-         -> Int -- ^ Length
-         -> B.ByteString
-getStoryBytes h offset length = B.take length $ B.drop offset (storyBytes h)
+-- HasMemory defines the interface to raw memory
 
-streamStoryBytes :: Handle
-               -> Int -- ^ Offset
-               -> BL.ByteString
-streamStoryBytes h offset = BL.fromStrict $ B.drop offset (storyBytes h)
+class HasMemory env where
+  getHeader :: RIO env Header
+  getBytes :: Int -- ^ Offset
+           -> Int -- ^ Length
+           -> RIO env B.ByteString
+  streamBytes :: Int -- ^ Offset
+              -> RIO env BL.ByteString
 
-getHeader :: Handle -> Header
-getHeader h = runGet parseHeader (BL.fromStrict $ storyBytes h)
+instance HasMemory App where
+  getHeader = do env <- ask
+                 return $ runGet parseHeader (BL.fromStrict $ story env)
+  getBytes offset n = do env <- ask
+                         return $ B.take n $ B.drop offset (story env)
+  streamBytes offset = do env <- ask
+                          return $ BL.fromStrict $ B.drop offset (story env)
+
 
 parseHeader :: Get Header
 parseHeader = do
@@ -107,26 +97,32 @@ parseHeader = do
 
   return $ Header { .. }
 
-showHeader :: Header -> TL.Text
-showHeader header = TB.toLazyText $ mconcat [ bprint "Z-code version" zVersion F.int
-                                            , bprint "Interpreter flags" flags1 F.int
-                                            , bprint "Release number" releaseNumber F.int
-                                            , bprint "Size of resident memory" baseHighMemory F.hex
-                                            , bprint "Start PC" initPC F.hex
-                                            , bprint "Dictionary address" dictionaryOffset F.hex
-                                            , bprint "Object table address" objectTable F.hex
-                                            , bprint "Global variables address" variablesTable F.hex
-                                            , bprint "Size of dynamic memory" baseStaticMemory F.hex
-                                            , bprint "Game flags" flags2 F.int
-                                            , F.bprint (field F.text) "Serial number" (TL.fromStrict . TE.decodeUtf8 $
-                                                                                       serialCode header)
-                                            , bprint "Abbreviations address" abbreviationTableOffset F.hex
-                                            , bprint "File size" fileLength F.hex
-                                            , bprint "Checksum" checksum F.hex
-                                            -- TODO : Terminating keys
-                                            -- TODO : Header extension
-                                            , bprint "Inform Version" interpreterNumber F.int
-                                            ]
-  where
-    field typ = (F.right 26 ' ' %. F.text % ": ") % typ % "\n"
-    bprint fieldName accessor fieldType   = F.bprint (field fieldType) fieldName (accessor header)
+
+instance Display Header where
+  display header = mconcat [ dEntry "Z-code version" zVersion
+                           , dEntry "Interpreter flags" flags1
+                           , dEntry "Release number" releaseNumber
+                           , hexEntry "Size of resident memory" baseHighMemory
+                           , hexEntry "Start PC" initPC
+                           , hexEntry "Dictionary address" dictionaryOffset
+                           , hexEntry "Object table address" objectTable
+                           , hexEntry "Global variables address" variablesTable
+                           , hexEntry "Size of dynamic memory" baseStaticMemory
+                           , dEntry "Game flags" flags2
+                           , dEntry "Serial number" ((T.decodeUtf8With T.lenientDecode) . serialCode)
+                           , hexEntry "Abbreviations address" abbreviationTableOffset
+                           , dEntry "File size" fileLength
+                           , hexEntry "Checksum" checksum
+                             -- TODO : Terminating keys
+                             -- TODO : Header extension
+                           , dEntry "Inform Version" interpreterNumber
+                           ]
+    where
+      -- entry :: Display a => Text -> (Header -> a) -> Utf8Builder
+      -- entry fieldName accessor =  (display fieldName) <> ": " <> (display (accessor header)) <> "\n"
+      entry :: Display a => Text -> a -> Utf8Builder
+      entry name value = (display name) <> ": " <> (display value) <> "\n"
+      hexEntry :: Text -> (Header -> Word16) -> Utf8Builder
+      hexEntry name accessor = entry name (T.pack $ (N.showHex (accessor header)) "")
+      dEntry :: Display a => Text -> (Header -> a) -> Utf8Builder
+      dEntry name accessor = entry name (accessor header)

@@ -21,24 +21,68 @@ description:         Please see the README on GitHub at <https://github.com/step
 
 dependencies:
 - base >= 4.7 && < 5
+- rio >= 0.1.11.0 && < 0.2
 - binary >= 0.8.3.0 && < 0.9
-- bytestring
 - text
 - text-latin1
-- vector
-- formatting
 - pretty-hex
 - hspec
 - QuickCheck
 - quickcheck-instances
-- mtl
-- transformers
+#- mtl
+#- transformers
 - parsec
 
 library:
   source-dirs: src
   ghc-options:
     - -Wall
+    - -Wcompat
+    - -Widentities
+    - -Wincomplete-record-updates
+    - -Wincomplete-uni-patterns
+    - -Wpartial-fields
+    - -Wredundant-constraints
+  default-extensions:
+    - AutoDeriveTypeable
+    - BangPatterns
+    - BinaryLiterals
+    - ConstraintKinds
+    - DataKinds
+    - DefaultSignatures
+    - DeriveDataTypeable
+    - DeriveFoldable
+    - DeriveFunctor
+    - DeriveGeneric
+    - DeriveTraversable
+    - DoAndIfThenElse
+    - EmptyDataDecls
+    - ExistentialQuantification
+    - FlexibleContexts
+    - FlexibleInstances
+    - FunctionalDependencies
+    - GADTs
+    - GeneralizedNewtypeDeriving
+    - InstanceSigs
+    - KindSignatures
+    - LambdaCase
+    - MonadFailDesugaring
+    - MultiParamTypeClasses
+    - MultiWayIf
+    - NamedFieldPuns
+    - NoImplicitPrelude
+    - OverloadedStrings
+    - PartialTypeSignatures
+    - PatternGuards
+    - PolyKinds
+    - RankNTypes
+    - RecordWildCards
+    - ScopedTypeVariables
+    - StandaloneDeriving
+    - TupleSections
+    - TypeFamilies
+    - TypeSynonymInstances
+    - ViewPatterns
 
 executables:
   hzm:
@@ -51,6 +95,8 @@ executables:
     - -Wall
     dependencies:
     - zmachine
+    default-extensions:
+      - OverloadedStrings
 
 tests:
   zmachine-test:
