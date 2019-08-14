@@ -20,13 +20,13 @@ main = do
     let mStoryFile = L.headMaybe args
     case mStoryFile of
       Nothing -> B.putStr "No story file specified\n"
-      Just story -> do file <- BL.readFile story
-                       let app = App { appLogger = logFunc
-                                     , story = BL.toStrict file
-                                     }
-                       runRIO app dump
+      Just storyPath -> do file <- BL.readFile storyPath
+                           let app = App { appLogger = logFunc
+                                         , story = BL.toStrict file
+                                         }
+                           runRIO app dump
 
 dump :: RIO App ()
 dump = do env <- ask
-          logInfo $ M.showHeader (M.getHeader env)
-          logInfo $ D.showDictionary (D.dictionary env)
+          logInfo . display $ M.getHeader env
+          logInfo . display $ D.dictionary env

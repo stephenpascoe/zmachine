@@ -1,6 +1,5 @@
 module Language.ZMachine.Memory
   ( HasMemory(..)
-  , showHeader
   ) where
 
 import RIO hiding (Handle)
@@ -98,32 +97,31 @@ parseHeader = do
   return $ Header { .. }
 
 
--- TODO : Convert to Display instance
-showHeader :: Header -> Utf8Builder
-showHeader header = mconcat [ dEntry "Z-code version" zVersion
-                            , dEntry "Interpreter flags" flags1
-                            , dEntry "Release number" releaseNumber
-                            , hexEntry "Size of resident memory" baseHighMemory
-                            , hexEntry "Start PC" initPC
-                            , hexEntry "Dictionary address" dictionaryOffset
-                            , hexEntry "Object table address" objectTable
-                            , hexEntry "Global variables address" variablesTable
-                            , hexEntry "Size of dynamic memory" baseStaticMemory
-                            , dEntry "Game flags" flags2
-                            , dEntry "Serial number" ((T.decodeUtf8With T.lenientDecode) . serialCode)
-                            , hexEntry "Abbreviations address" abbreviationTableOffset
-                            , dEntry "File size" fileLength
-                            , hexEntry "Checksum" checksum
-                              -- TODO : Terminating keys
-                              -- TODO : Header extension
-                            , dEntry "Inform Version" interpreterNumber
-                            ]
-  where
-    -- entry :: Display a => Text -> (Header -> a) -> Utf8Builder
-    -- entry fieldName accessor =  (display fieldName) <> ": " <> (display (accessor header)) <> "\n"
-    entry :: Display a => Text -> a -> Utf8Builder
-    entry name value = (display name) <> ": " <> (display value) <> "\n"
-    hexEntry :: Text -> (Header -> Word16) -> Utf8Builder
-    hexEntry name accessor = entry name (T.pack $ (N.showHex (accessor header)) "")
-    dEntry :: Display a => Text -> (Header -> a) -> Utf8Builder
-    dEntry name accessor = entry name (accessor header)
+instance Display Header where
+  display header = mconcat [ dEntry "Z-code version" zVersion
+                           , dEntry "Interpreter flags" flags1
+                           , dEntry "Release number" releaseNumber
+                           , hexEntry "Size of resident memory" baseHighMemory
+                           , hexEntry "Start PC" initPC
+                           , hexEntry "Dictionary address" dictionaryOffset
+                           , hexEntry "Object table address" objectTable
+                           , hexEntry "Global variables address" variablesTable
+                           , hexEntry "Size of dynamic memory" baseStaticMemory
+                           , dEntry "Game flags" flags2
+                           , dEntry "Serial number" ((T.decodeUtf8With T.lenientDecode) . serialCode)
+                           , hexEntry "Abbreviations address" abbreviationTableOffset
+                           , dEntry "File size" fileLength
+                           , hexEntry "Checksum" checksum
+                             -- TODO : Terminating keys
+                             -- TODO : Header extension
+                           , dEntry "Inform Version" interpreterNumber
+                           ]
+    where
+      -- entry :: Display a => Text -> (Header -> a) -> Utf8Builder
+      -- entry fieldName accessor =  (display fieldName) <> ": " <> (display (accessor header)) <> "\n"
+      entry :: Display a => Text -> a -> Utf8Builder
+      entry name value = (display name) <> ": " <> (display value) <> "\n"
+      hexEntry :: Text -> (Header -> Word16) -> Utf8Builder
+      hexEntry name accessor = entry name (T.pack $ (N.showHex (accessor header)) "")
+      dEntry :: Display a => Text -> (Header -> a) -> Utf8Builder
+      dEntry name accessor = entry name (accessor header)

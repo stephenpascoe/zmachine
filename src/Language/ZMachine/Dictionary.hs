@@ -2,7 +2,6 @@ module Language.ZMachine.Dictionary
   ( dictionary
   , DictionaryHeader(..)
   , Dictionary(..)
-  , showDictionary
     --
   , decodeWordEntries
   ) where
@@ -54,8 +53,8 @@ decodeWordEntries v h = let nmax = numEntries h
                         in f 0
 
 
-showDictionary :: Dictionary -> Utf8Builder
-showDictionary dict = mconcat entryBs where
-  buildEntry :: (Integer, ZsciiString) -> Utf8Builder
-  buildEntry (i, zseq) = "[" <> (display i) <> "] " <> (display (Z.zseqToText zseq)) <> "\n"
-  entryBs = map buildEntry $ zip [0..] (entries dict)
+instance Display Dictionary where
+  display dict = mconcat entryBs where
+    buildEntry :: (Integer, ZsciiString) -> Utf8Builder
+    buildEntry (i, zseq) = "[" <> (display i) <> "] " <> (display (Z.zseqToText zseq)) <> "\n"
+    entryBs = map buildEntry $ zip [0..] (entries dict)
