@@ -23,15 +23,14 @@ class HasDictionary env where
   getDictionary :: M.HasMemory env => RIO env Dictionary
 
 instance HasDictionary App where
-  getDictionary = do env <- ask
-                     let header = M.getHeader env
-                         dictOffset = dictionaryOffset header
+  getDictionary = do header <- M.getHeader
+                     let dictOffset = dictionaryOffset header
                          version = zVersion header
                          aTable = Nothing
-                       in case runGet (decodeDictionary version aTable)
-                                      (M.streamBytes env (fromIntegral dictOffset)) of
-                            Left err -> throwIO $ ZsciiException err
-                            Right dict -> return dict
+                     stream <- M.streamBytes (fromIntegral dictOffset)
+                     case runGet (decodeDictionary version aTable) stream  of
+                       Left err -> throwIO $ ZsciiException err
+                       Right dict -> return dict
 
 
 decodeDictionary :: Version -> Maybe AbbreviationTable -> Get (Either T.Text Dictionary)

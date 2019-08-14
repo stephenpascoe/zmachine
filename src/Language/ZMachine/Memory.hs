@@ -27,19 +27,20 @@ close _ = return ()
 -- HasMemory defines the interface to raw memory
 
 class HasMemory env where
-  getHeader :: env -> Header
-  getBytes :: env
-           -> Int -- ^ Offset
+  getHeader :: RIO env Header
+  getBytes :: Int -- ^ Offset
            -> Int -- ^ Length
-           -> B.ByteString
-  streamBytes :: env
-              -> Int -- ^ Offset
-              -> BL.ByteString
+           -> RIO env B.ByteString
+  streamBytes :: Int -- ^ Offset
+              -> RIO env BL.ByteString
 
 instance HasMemory App where
-  getHeader env = runGet parseHeader (BL.fromStrict $ story env)
-  getBytes env offset n = B.take n $ B.drop offset (story env)
-  streamBytes env offset = BL.fromStrict $ B.drop offset (story env)
+  getHeader = do env <- ask
+                 return $ runGet parseHeader (BL.fromStrict $ story env)
+  getBytes offset n = do env <- ask
+                         return $ B.take n $ B.drop offset (story env)
+  streamBytes offset = do env <- ask
+                          return $ BL.fromStrict $ B.drop offset (story env)
 
 
 parseHeader :: Get Header
