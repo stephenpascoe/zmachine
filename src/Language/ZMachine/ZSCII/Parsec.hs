@@ -5,6 +5,7 @@ module Language.ZMachine.ZSCII.Parsec
 import RIO hiding (many, try, (<|>))
 
 import qualified RIO.ByteString as B
+import qualified RIO.Text as T
 import RIO.Vector.Boxed ((!?))
 import Text.Parsec.Prim
 import Text.Ascii
@@ -100,7 +101,7 @@ zcharsToZscii version aTable zchars =
                         4 -> shiftDown *> pure EmptyToken
                         5 -> shiftUp *> pure EmptyToken
 
-                        _ -> error "Not a special character"
+                        _ -> fail "Not a special character"
 
       specialV3 = do z <- specialChar
                      case z of
@@ -111,7 +112,7 @@ zcharsToZscii version aTable zchars =
                        4 -> shiftUpOnce
                        5 -> shiftDownOnce
 
-                       _ -> error "Not a special character"
+                       _ -> fail "Not a special character"
 
       -- Normal character parser
 
@@ -138,7 +139,9 @@ zcharsToZscii version aTable zchars =
       -- Abbreviation parser
       abbrev :: Int -> ZsciiParsec Token
       abbrev x = do z <- anyChar
-                    return $ getAbbreviation aTable x z
+                    case getAbbreviation aTable x z of
+                      Left err -> fail (T.unpack err)
+                      Right tok -> return tok
   in
     case runParser parseZstring Alpha0 "ZString decoder" zchars of
       Left e -> error $ show e
@@ -146,11 +149,10 @@ zcharsToZscii version aTable zchars =
 
 
 
--- TODO : Replace error with exception monad
-getAbbreviation :: Maybe AbbreviationTable -> Int -> ZChar -> Token
-getAbbreviation Nothing _ _ = error "No abbreviations available"
+getAbbreviation :: Maybe AbbreviationTable -> Int -> ZChar -> Either Text Token
+getAbbreviation Nothing _ _ = Left "No abbreviations available"
 -- TODO : When we see some abrevations, implement this
 
 getAbbreviation (Just t) a b = case t !? ((a * 32) + fromIntegral b) of
-                                 Nothing -> error "Abbreviation index out of range"
-                                 Just x -> AbrevToken x
+                                 Nothing -> Left "Abbreviation index out of range"
+                                 Just x -> Right $ AbrevToken x
