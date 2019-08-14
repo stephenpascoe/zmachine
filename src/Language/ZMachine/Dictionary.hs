@@ -20,19 +20,18 @@ data ZsciiException = ZsciiException T.Text deriving (Show, Typeable)
 instance Exception ZsciiException
 
 class HasDictionary env where
-  dictionary :: M.HasMemory env => RIO env Dictionary
+  getDictionary :: M.HasMemory env => RIO env Dictionary
 
 instance HasDictionary App where
-  dictionary = do env <- ask
-                  let header = M.getHeader env
-                      dictOffset = dictionaryOffset header
-                      version = zVersion header
-                      aTable = Nothing
-                   in
-                     case  runGet (decodeDictionary version aTable)
-                           (M.streamBytes env (fromIntegral dictOffset)) of
-                       Left err -> throwIO $ ZsciiException err
-                       Right dict -> return dict
+  getDictionary = do env <- ask
+                     let header = M.getHeader env
+                         dictOffset = dictionaryOffset header
+                         version = zVersion header
+                         aTable = Nothing
+                       in case runGet (decodeDictionary version aTable)
+                                      (M.streamBytes env (fromIntegral dictOffset)) of
+                            Left err -> throwIO $ ZsciiException err
+                            Right dict -> return dict
 
 
 decodeDictionary :: Version -> Maybe AbbreviationTable -> Get (Either T.Text Dictionary)
