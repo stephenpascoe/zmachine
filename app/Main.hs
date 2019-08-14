@@ -28,5 +28,6 @@ main = do
 
 dump :: RIO App ()
 dump = do env <- ask
+          dict <- D.dictionary
           logInfo . display $ M.getHeader env
-          logInfo . display $ D.dictionary env
+          logInfo . display $ dict

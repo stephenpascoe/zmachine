@@ -1,6 +1,5 @@
 module Language.ZMachine.Dictionary
-  ( dictionary
-  , DictionaryHeader(..)
+  ( HasDictionary(..)
   , Dictionary(..)
     --
   , decodeWordEntries
@@ -8,28 +7,42 @@ module Language.ZMachine.Dictionary
 
 import RIO
 
+import qualified RIO.Text as T
 import Data.Binary.Get
 
 import qualified Language.ZMachine.Memory as M
 import qualified Language.ZMachine.ZSCII as Z
+import Language.ZMachine.App (App)
 import Language.ZMachine.Types
 
 
-dictionary :: M.HasMemory env => env -> Dictionary
-dictionary env = let header = M.getHeader env
-                     dictOffset = dictionaryOffset header
-                     version = zVersion header
-                     aTable = Nothing
-               in
-                 runGet (decodeDictionary version aTable) (M.streamBytes env (fromIntegral dictOffset))
+data ZsciiException = ZsciiException T.Text deriving (Show, Typeable)
+instance Exception ZsciiException
+
+class HasDictionary env where
+  dictionary :: M.HasMemory env => RIO env Dictionary
+
+instance HasDictionary App where
+  dictionary = do env <- ask
+                  let header = M.getHeader env
+                      dictOffset = dictionaryOffset header
+                      version = zVersion header
+                      aTable = Nothing
+                   in
+                     case  runGet (decodeDictionary version aTable)
+                           (M.streamBytes env (fromIntegral dictOffset)) of
+                       Left err -> throwIO $ ZsciiException err
+                       Right dict -> return dict
 
 
-decodeDictionary :: Version -> Maybe AbbreviationTable -> Get Dictionary
+decodeDictionary :: Version -> Maybe AbbreviationTable -> Get (Either T.Text Dictionary)
 decodeDictionary version aTable = do
   dHeader <- decodeDictionaryHeader
   rawEntries <- decodeWordEntries version dHeader
-  let entries = fmap (Z.decodeZString version aTable) rawEntries
-  return $ Dictionary dHeader entries
+  let eEntries = sequenceA $ fmap  (Z.decodeZString version aTable) rawEntries
+  return $ case eEntries of
+             Left err -> Left err
+             Right entries -> Right $ Dictionary dHeader entries
 
 decodeDictionaryHeader :: Get DictionaryHeader
 decodeDictionaryHeader = do n <- getWord8

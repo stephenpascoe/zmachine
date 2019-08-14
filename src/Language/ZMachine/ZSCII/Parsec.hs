@@ -29,12 +29,10 @@ getAlphabetTable _ Alpha1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 getAlphabetTable _ Alpha2 = "^\n0123456789.,!?_#'\"/\\-:()"
 
 
--- TODO : Put in Either monad for error reporting
-
-decodeZString :: Version                 -- ^ ZMachine version
-              -> Maybe AbbreviationTable -- ^ Abbreviations, if available
-              -> ZString                 -- ^ Input ZString
-              -> ZsciiString             -- ^ Resulting ZsciiString
+decodeZString :: Version                   -- ^ ZMachine version
+              -> Maybe AbbreviationTable   -- ^ Abbreviations, if available
+              -> ZString                   -- ^ Input ZString
+              -> Either Text ZsciiString   -- ^ Resulting ZsciiString or error
 decodeZString version aTable zstr = zcharsToZscii version aTable (zstrToZchars zstr)
 
 -- | Token is used inside the Zstring parser to handle shift events and abreviations
@@ -47,7 +45,7 @@ foldTokens toks = ZsciiString $ foldl' f "" toks where
   f acc (AbrevToken (ZsciiString abrev)) = B.append acc abrev
   f acc (ZCharToken zchar) = B.snoc acc zchar
 
-zcharsToZscii :: Version -> Maybe AbbreviationTable -> [ZChar] -> ZsciiString
+zcharsToZscii :: Version -> Maybe AbbreviationTable -> [ZChar] -> Either Text ZsciiString
 zcharsToZscii version aTable zchars =
   let parseZstring :: ZsciiParsec ZsciiString
       parseZstring = foldTokens <$> many element
@@ -144,9 +142,8 @@ zcharsToZscii version aTable zchars =
                       Right tok -> return tok
   in
     case runParser parseZstring Alpha0 "ZString decoder" zchars of
-      Left e -> error $ show e
-      Right zscii -> zscii
-
+      Left e -> Left $ T.pack (show e)
+      Right zscii -> Right zscii
 
 
 getAbbreviation :: Maybe AbbreviationTable -> Int -> ZChar -> Either Text Token
