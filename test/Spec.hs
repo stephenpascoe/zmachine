@@ -64,7 +64,7 @@ main = hspec $ do
                            1 -> zchars == []
                            _ -> L.length zchars > 0
     it "A padding word is ignored" $ do
-      decodeZString 1 Nothing (zcharsToZstr [5, 5, 5]) `shouldBe` (Right $ ZsciiString "")
+      decodeZString 1 Nothing (zcharsToZstr [5, 5, 5]) `shouldBe` (ZsciiString "")
 
 
     -- TODO : test stop-bit logic

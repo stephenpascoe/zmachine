@@ -1,3 +1,8 @@
+{-
+
+Functions here may throw ZsciiException on data that cannot be handled.
+
+-}
 module Language.ZMachine.Dictionary
   ( HasDictionary(..)
   , Dictionary(..)
@@ -16,9 +21,6 @@ import Language.ZMachine.App (App)
 import Language.ZMachine.Types
 
 
-data ZsciiException = ZsciiException T.Text deriving (Show, Typeable)
-instance Exception ZsciiException
-
 class HasDictionary env where
   getDictionary :: M.HasMemory env => RIO env Dictionary
 
@@ -28,19 +30,15 @@ instance HasDictionary App where
                          version = zVersion header
                          aTable = Nothing
                      stream <- M.streamBytes (fromIntegral dictOffset)
-                     case runGet (decodeDictionary version aTable) stream  of
-                       Left err -> throwIO $ ZsciiException err
-                       Right dict -> return dict
+                     return $ runGet (decodeDictionary version aTable) stream
 
 
-decodeDictionary :: Version -> Maybe AbbreviationTable -> Get (Either T.Text Dictionary)
+decodeDictionary :: Version -> Maybe AbbreviationTable -> Get Dictionary
 decodeDictionary version aTable = do
   dHeader <- decodeDictionaryHeader
   rawEntries <- decodeWordEntries version dHeader
-  let eEntries = sequenceA $ fmap  (Z.decodeZString version aTable) rawEntries
-  return $ case eEntries of
-             Left err -> Left err
-             Right entries -> Right $ Dictionary dHeader entries
+  let entries = fmap (Z.decodeZString version aTable) rawEntries
+  return $ Dictionary dHeader entries
 
 decodeDictionaryHeader :: Get DictionaryHeader
 decodeDictionaryHeader = do n <- getWord8

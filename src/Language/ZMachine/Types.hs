@@ -8,6 +8,9 @@ module Language.ZMachine.Types
   , ZChar
   , AbbreviationTable
   , Version
+  , Property(..)
+  , Object(..)
+  , ObjectTable(..)
   ) where
 
 import RIO
@@ -93,3 +96,14 @@ newtype ZString = ZString { unZString :: B.ByteString } deriving (Show, Eq)
 
 -- | A ByteString representing a decoded ZString into a squence of Zscii charaters
 newtype ZsciiString = ZsciiString { unZsciiString :: B.ByteString } deriving (Show, Eq)
+
+
+-- | Properties are unstructured binary data
+data Property = Property Int8 ByteString deriving Show
+
+data Object = Object { attributes :: Word64
+                     , description :: ZsciiString
+                     , properties :: [Property]
+                     } deriving Show
+
+data ObjectTable = ObjectTable [Object]

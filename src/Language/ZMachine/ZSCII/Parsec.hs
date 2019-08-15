@@ -1,5 +1,6 @@
 module Language.ZMachine.ZSCII.Parsec
  ( decodeZString
+ , ZsciiException(..)
  ) where
 
 import RIO hiding (many, try, (<|>))
@@ -13,6 +14,10 @@ import Data.Bits
 
 import Language.ZMachine.Types
 import Language.ZMachine.ZSCII.ZChars
+
+
+data ZsciiException = ZsciiException T.Text deriving (Show, Typeable)
+instance Exception ZsciiException
 
 data Alphabet = Alpha0 | Alpha1 | Alpha2 deriving Eq
 
@@ -32,7 +37,7 @@ getAlphabetTable _ Alpha2 = "^\n0123456789.,!?_#'\"/\\-:()"
 decodeZString :: Version                   -- ^ ZMachine version
               -> Maybe AbbreviationTable   -- ^ Abbreviations, if available
               -> ZString                   -- ^ Input ZString
-              -> Either Text ZsciiString   -- ^ Resulting ZsciiString or error
+              -> ZsciiString               -- ^ Resulting ZsciiString or error
 decodeZString version aTable zstr = zcharsToZscii version aTable (zstrToZchars zstr)
 
 -- | Token is used inside the Zstring parser to handle shift events and abreviations
@@ -45,7 +50,7 @@ foldTokens toks = ZsciiString $ foldl' f "" toks where
   f acc (AbrevToken (ZsciiString abrev)) = B.append acc abrev
   f acc (ZCharToken zchar) = B.snoc acc zchar
 
-zcharsToZscii :: Version -> Maybe AbbreviationTable -> [ZChar] -> Either Text ZsciiString
+zcharsToZscii :: Version -> Maybe AbbreviationTable -> [ZChar] -> ZsciiString
 zcharsToZscii version aTable zchars =
   let parseZstring :: ZsciiParsec ZsciiString
       parseZstring = foldTokens <$> many element
@@ -137,19 +142,18 @@ zcharsToZscii version aTable zchars =
       -- Abbreviation parser
       abbrev :: Int -> ZsciiParsec Token
       abbrev x = do z <- anyChar
-                    case getAbbreviation aTable x z of
-                      Left err -> fail (T.unpack err)
-                      Right tok -> return tok
+                    return $ getAbbreviation aTable x z
   in
     case runParser parseZstring Alpha0 "ZString decoder" zchars of
-      Left e -> Left $ T.pack (show e)
-      Right zscii -> Right zscii
+      Left e -> impureThrow $ ZsciiException (T.pack (show e))
+      Right zscii -> zscii
 
 
-getAbbreviation :: Maybe AbbreviationTable -> Int -> ZChar -> Either Text Token
-getAbbreviation Nothing _ _ = Left "No abbreviations available"
+getAbbreviation :: Maybe AbbreviationTable -> Int -> ZChar -> Token
+getAbbreviation Nothing _ _ = impureThrow $ ZsciiException "No abbreviations available"
 -- TODO : When we see some abrevations, implement this
 
-getAbbreviation (Just t) a b = case t !? ((a * 32) + fromIntegral b) of
-                                 Nothing -> Left "Abbreviation index out of range"
-                                 Just x -> Right $ AbrevToken x
+getAbbreviation (Just t) a b =
+  case t !? ((a * 32) + fromIntegral b) of
+    Nothing -> impureThrow $ ZsciiException "Abbreviation index out of range"
+    Just x -> AbrevToken x
