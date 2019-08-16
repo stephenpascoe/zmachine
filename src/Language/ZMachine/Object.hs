@@ -1,12 +1,16 @@
 module Language.ZMachine.Object
   ( HasObjects(..)
+  , ObjectTable
+  , Object(..)
+  , Property(..)
   ) where
 
 import RIO
 import qualified RIO.Text as T
 import qualified RIO.ByteString as B
 import qualified RIO.HashMap as H
-import qualified RIO.Vector as V
+import qualified RIO.Vector.Boxed as V
+import Hexdump (simpleHex)
 
 import Language.ZMachine.Types
 import qualified Language.ZMachine.Memory as M
@@ -16,12 +20,47 @@ import Language.ZMachine.App (App)
 import Data.Binary.Get
 import Data.Bits
 
+-- TODO : Default properties table
+-- TODO : buildTree
 
 class HasObjects env where
   getObjects :: M.HasMemory env => RIO env ObjectTable
 
 instance HasObjects App where
   getObjects = readObjects
+
+
+-- | Properties are unstructured binary data
+data Property = Property Int8 ByteString deriving Show
+
+data Object = Object { attributes :: B.ByteString
+                     , description :: ZsciiString
+                     , parentId :: Integer
+                     , siblingId :: Integer
+                     , childId :: Integer
+                     , properties :: [Property]
+                     } deriving Show
+
+type ObjectTable = V.Vector Object
+
+instance Display Property where
+  display (Property n propData) = "[" <> display n <> "] "
+                                  <> display (T.pack . simpleHex $ propData)
+
+instance Display Object where
+  display obj = "Attributes: " <> display (T.pack . simpleHex . attributes $ obj) <> "\n"
+                <> "Parent: " <> display (parentId obj) <> "  "
+                <> "Sibling: " <> display (siblingId obj) <> "  "
+                <> "Child: " <> display (childId obj) <> "\n"
+                <> "Description: \"" <> (display . Z.zseqToText $ description obj) <> "\"\n"
+                <> "Properties:\n" <> props
+    where
+      props = mconcat (fmap f (properties obj))
+      f prop = "  " <> display prop <> "\n"
+
+instance Display ObjectTable where
+  display objs = mconcat (fmap f $ zip [(1::Int)..] (V.toList objs)) where
+    f (i, obj) = display i <> ". " <> display obj <> "\n"
 
 -- Slightly different representation of Object, useful during decoding
 data ObjectRec = ObjectRec { attributes' :: B.ByteString
@@ -32,14 +71,6 @@ data ObjectRec = ObjectRec { attributes' :: B.ByteString
                            }
 
 type Record = (ObjectRec, (ZsciiString, [Property]))
-
-{-
-buildTree :: [Record] -> ObjectTable
-buildTree objs =
-  let objMap = foldr f H.empty objs
-      f rec@(objNum, _, _) acc = H.insert objNum rec
-  in undefined
--}
 
 readObjects :: M.HasMemory env => RIO env ObjectTable
 readObjects = do header <- M.getHeader
@@ -144,22 +175,9 @@ decodeObjectRec version
                                       , childId' = fromIntegral childId'
                                       , propertyAddr' = propertyAddr
                                       }
-  | version >= 4 = do attributes <- getByteString 6
-                      parentId <- getWord16be
-                      siblingId <- getWord16be
-                      childId <- getWord16be
-                      propertyAddr <- getWord16be
+  | version >= 4 = do attributes' <- getByteString 6
+                      parentId' <- getWord16be
+                      siblingId' <- getWord16be
+                      childId' <- getWord16be
+                      propertyAddr' <- getWord16be
                       return ObjectRec { .. }
-
-{-
-decodeObject :: Version -> (Word16 -> Properties) -> Get Object
-decodeObject version getProps
-  | version < 4 = do attributes <- getWord32be
-                     parent <- getWord8
-                     sibling <- getWord8
-                     child <- getWord8
-                     propAddr <- getWord16be
-                     let prop = getProps propAddr
-                     return $ Object { attributes = fromIntegral attributes
-                                     ,
--}

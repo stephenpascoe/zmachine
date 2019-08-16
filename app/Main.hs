@@ -33,3 +33,4 @@ dump = do dict <- D.getDictionary
           objects <- OB.getObjects
           logInfo . display $ header
           logInfo . display $ dict
+          logInfo . display $ objects

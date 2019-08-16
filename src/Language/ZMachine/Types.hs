@@ -8,9 +8,6 @@ module Language.ZMachine.Types
   , ZChar
   , AbbreviationTable
   , Version
-  , Property(..)
-  , Object(..)
-  , ObjectTable(..)
   , ByteAddress
   ) where
 
@@ -97,17 +94,3 @@ newtype ZString = ZString { unZString :: B.ByteString } deriving (Show, Eq)
 
 -- | A ByteString representing a decoded ZString into a squence of Zscii charaters
 newtype ZsciiString = ZsciiString { unZsciiString :: B.ByteString } deriving (Show, Eq)
-
-
--- | Properties are unstructured binary data
-data Property = Property Int8 ByteString deriving Show
-
-data Object = Object { attributes :: B.ByteString
-                     , description :: ZsciiString
-                     , parentId :: Integer
-                     , siblingId :: Integer
-                     , childId :: Integer
-                     , properties :: [Property]
-                     } deriving Show
-
-type ObjectTable = V.Vector Object
