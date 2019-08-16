@@ -11,6 +11,7 @@ module Language.ZMachine.Types
   , Property(..)
   , Object(..)
   , ObjectTable(..)
+  , ByteAddress
   ) where
 
 import RIO
@@ -101,9 +102,12 @@ newtype ZsciiString = ZsciiString { unZsciiString :: B.ByteString } deriving (Sh
 -- | Properties are unstructured binary data
 data Property = Property Int8 ByteString deriving Show
 
-data Object = Object { attributes :: Word64
+data Object = Object { attributes :: B.ByteString
                      , description :: ZsciiString
+                     , parentId :: Integer
+                     , siblingId :: Integer
+                     , childId :: Integer
                      , properties :: [Property]
                      } deriving Show
 
-data ObjectTable = ObjectTable [Object]
+type ObjectTable = V.Vector Object
