@@ -14,18 +14,25 @@ import qualified RIO.ByteString.Lazy as BL
 
 
 main :: IO ()
-main = do
+main = do runApp dump
+          return ()
+
+-- TODO : refactor to aid debugging
+runApp :: RIO App a -> IO (Maybe a)
+runApp action = do
   logOptions' <- logOptionsHandle stdout False
   withLogFunc logOptions' $ \logFunc -> do
     args <- liftIO $ getArgs
     let mStoryFile = L.headMaybe args
     case mStoryFile of
-      Nothing -> B.putStr "No story file specified\n"
+      Nothing -> do B.putStr "No story file specified\n"
+                    pure Nothing
       Just storyPath -> do file <- BL.readFile storyPath
                            let app = App { appLogger = logFunc
                                          , story = BL.toStrict file
                                          }
-                           runRIO app dump
+                           Just <$> runRIO app action
+
 
 dump :: RIO App ()
 dump = do dict <- D.getDictionary

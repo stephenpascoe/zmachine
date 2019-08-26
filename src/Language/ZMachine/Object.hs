@@ -41,7 +41,9 @@ data Object = Object { attributes :: B.ByteString
                      , properties :: [Property]
                      } deriving Show
 
-type ObjectTable = V.Vector Object
+type PropertyDefaults = V.Vector Word32
+
+data ObjectTable = ObjectTable PropertyDefaults (V.Vector Object)
 
 instance Display Property where
   display (Property n propData) = "[" <> display n <> "] "
@@ -58,9 +60,12 @@ instance Display Object where
       props = mconcat (fmap f (properties obj))
       f prop = "  " <> display prop <> "\n"
 
+-- TODO : Display defaults?
 instance Display ObjectTable where
-  display objs = mconcat (fmap f $ zip [(1::Int)..] (V.toList objs)) where
-    f (i, obj) = display i <> ". " <> display obj <> "\n"
+  display (ObjectTable propDefaults objs) =
+    mconcat (fmap f $ zip [(1::Int)..] (V.toList objs))
+    where
+      f (i, obj) = display i <> ". " <> display obj <> "\n"
 
 -- Slightly different representation of Object, useful during decoding
 data ObjectRec = ObjectRec { attributes' :: B.ByteString
@@ -72,12 +77,15 @@ data ObjectRec = ObjectRec { attributes' :: B.ByteString
 
 type Record = (ObjectRec, (ZsciiString, [Property]))
 
+
 readObjects :: M.HasMemory env => RIO env ObjectTable
 readObjects = do header <- M.getHeader
                  let offset = objectTable header
-                 objRecs <- readObjectRecs offset
+                     propDefaultsLen = if zVersion header < 4 then 31 else 63
+                 propDefaults <- readPropDefaults offset propDefaultsLen
+                 objRecs <- readObjectRecs (offset + (fromIntegral propDefaultsLen*4) + 1)
                  properties <- traverse f objRecs
-                 return $ V.fromList $ zipWith g objRecs properties
+                 return $ ObjectTable propDefaults (V.fromList $ zipWith g objRecs properties)
                    where f objRec = readPropertyTable (propertyAddr' objRec)
                          g obj (desc, props) = Object { attributes = attributes' obj
                                                       , description = desc
@@ -86,6 +94,13 @@ readObjects = do header <- M.getHeader
                                                       , childId = fromIntegral $ childId' obj
                                                       , properties = props
                                                       }
+
+-- Read the property defaults table
+readPropDefaults :: M.HasMemory env => ByteAddress -> Int -> RIO env PropertyDefaults
+readPropDefaults offset recs = do stream <- M.streamBytes (fromIntegral offset)
+                                  return $ runGet f stream where
+                                    f = sequenceA $ V.replicate recs getWord32be
+
 
 -- Read ObjectRec remembering the number of bytes read
 readObjectRec :: M.HasMemory env => ByteAddress -> RIO env (ObjectRec, ByteAddress)
