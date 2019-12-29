@@ -12,8 +12,8 @@ import Text.Parsec.Prim
 import Text.Ascii
 import Data.Bits
 
-import Language.ZMachine.Types
 import Language.ZMachine.ZSCII.ZChars
+import qualified Language.ZMachine.Memory as M
 
 
 data ZsciiException = ZsciiException T.Text deriving (Show, Typeable)
@@ -25,16 +25,16 @@ type ZsciiParsec = Parsec [ZChar] Alphabet
 
 
 
-getAlphabetTable :: Version -> Alphabet -> B.ByteString
-getAlphabetTable 1 Alpha0 = "abcdefghijklmnopqrstuvwxyz"
-getAlphabetTable 1 Alpha1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-getAlphabetTable 1 Alpha2 = "^0123456789.,!?_#'\"/\\<-:()"
+getAlphabetTable :: M.ZVersion -> Alphabet -> B.ByteString
+getAlphabetTable M.ZVer1 Alpha0 = "abcdefghijklmnopqrstuvwxyz"
+getAlphabetTable M.ZVer1 Alpha1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+getAlphabetTable M.ZVer1 Alpha2 = "^0123456789.,!?_#'\"/\\<-:()"
 getAlphabetTable _ Alpha0 = "abcdefghijklmnopqrstuvwxyz"
 getAlphabetTable _ Alpha1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 getAlphabetTable _ Alpha2 = "^\n0123456789.,!?_#'\"/\\-:()"
 
 
-decodeZString :: Version                   -- ^ ZMachine version
+decodeZString :: M.ZVersion                -- ^ ZMachine version
               -> Maybe AbbreviationTable   -- ^ Abbreviations, if available
               -> ZString                   -- ^ Input ZString
               -> ZsciiString               -- ^ Resulting ZsciiString or error
@@ -50,7 +50,7 @@ foldTokens toks = ZsciiString $ foldl' f "" toks where
   f acc (AbrevToken (ZsciiString abrev)) = B.append acc abrev
   f acc (ZCharToken zchar) = B.snoc acc zchar
 
-zcharsToZscii :: Version -> Maybe AbbreviationTable -> [ZChar] -> ZsciiString
+zcharsToZscii :: M.ZVersion -> Maybe AbbreviationTable -> [ZChar] -> ZsciiString
 zcharsToZscii version aTable zchars =
   let parseZstring :: ZsciiParsec ZsciiString
       parseZstring = foldTokens <$> many element
@@ -92,13 +92,14 @@ zcharsToZscii version aTable zchars =
                          return e
 
       -- Special character parser
-      special = if version < 3 then specialV12 else specialV3
+      special = if (M.zVersionToInt version) < 3 then specialV12 else specialV3
 
       specialV12 = do z <- specialChar
                       case z of
                         0 -> pure $ ZCharToken (ascii ' ')
-                        1 -> if version == 1 then pure $ ZCharToken (ascii '\n')
-                             else abbrev 1
+                        1 -> case version of 
+                              M.ZVer1 -> pure $ ZCharToken (ascii '\n')
+                              _ -> abbrev 1
                         2 -> shiftUpOnce
                         3 -> shiftDownOnce
                         4 -> shiftDown *> pure EmptyToken

@@ -8,12 +8,12 @@ import Data.Binary.Get
 import Data.List
 
 import qualified Language.ZMachine.Memory as M
-import Language.ZMachine.Types
+import Language.ZMachine.ZSCII (AbbreviationTable)
 
 getAbbreviations :: M.HasMemory env => RIO env AbbreviationTable
 getAbbreviations = do header <- M.getHeader
-                      let tableOffset = abbreviationTableOffset header
-                          tableLength = if zVersion header < 3 then 32 else 96
+                      let tableOffset = M.abbreviationTableOffset header
+                          tableLength = if (M.zVersionToInt $ M.zVersion header) < 3 then 32 else 96
                       stream <- M.streamBytes (fromIntegral tableOffset)
                       let tableOffsets = runGet (decodeTableOffsets tableLength) stream
                         in

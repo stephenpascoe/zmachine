@@ -1,19 +1,58 @@
 module Language.ZMachine.Memory
   ( HasMemory(..)
+  , Header(..)
+  , ByteAddress
+  , ZVersion(..)
+  , zVersionToInt
+  , zVersionFromInt
   ) where
 
 import RIO hiding (Handle)
 
 import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
-import qualified RIO.Text as T
-import qualified Numeric as N
 import Data.Binary.Get
 
-import Language.ZMachine.Types
 import Language.ZMachine.App
 
--- newtype Handle = Handle { storyBytes :: B.ByteString }
+import qualified RIO.Text as T
+import qualified Numeric as N
+
+
+type ByteAddress = Word16
+type Colour = Word8
+
+
+-- TODO : Use real data types for flags
+type Flags1 = Word8
+type Flags2 = Word8
+
+data ZVersion = ZVer1 | ZVer2 | ZVer3 | ZVer4 
+              | ZVer5 | ZVer6 | ZVer7 | ZVer8Plus deriving Show
+
+instance Display ZVersion where
+  display v = display $ zVersionToInt v
+
+zVersionFromInt :: Int8 -> ZVersion
+zVersionFromInt 1 = ZVer1
+zVersionFromInt 2 = ZVer2
+zVersionFromInt 3 = ZVer3
+zVersionFromInt 4 = ZVer4
+zVersionFromInt 5 = ZVer5
+zVersionFromInt 6 = ZVer6
+zVersionFromInt 7 = ZVer7
+zVersionFromInt _ = ZVer8Plus
+
+zVersionToInt :: ZVersion -> Int8
+zVersionToInt ZVer1 = 1
+zVersionToInt ZVer2 = 2
+zVersionToInt ZVer3 = 3
+zVersionToInt ZVer4 = 4
+zVersionToInt ZVer5 = 5
+zVersionToInt ZVer6 = 6
+zVersionToInt ZVer7 = 7
+zVersionToInt ZVer8Plus = 8
+
 
 {-
 new :: FilePath -> IO Handle
@@ -35,17 +74,15 @@ class HasMemory env where
               -> RIO env BL.ByteString
 
 instance HasMemory App where
-  getHeader = do env <- ask
-                 return $ runGet parseHeader (BL.fromStrict $ story env)
-  getBytes offset n = do env <- ask
-                         return $ B.take n $ B.drop offset (story env)
-  streamBytes offset = do env <- ask
-                          return $ BL.fromStrict $ B.drop offset (story env)
+  getHeader = runGet parseHeader . BL.fromStrict . story <$> ask
+  getBytes offset n = B.take n . B.drop offset . story <$> ask
+  streamBytes offset = BL.fromStrict . B.drop offset . story <$> ask
 
 
 parseHeader :: Get Header
 parseHeader = do
-  zVersion <- getInt8
+  versionInt <- getInt8
+  let zVersion = zVersionFromInt versionInt
   flags1 <- getWord8
   releaseNumber <- getWord16be
   baseHighMemory <- getWord16be
@@ -76,7 +113,7 @@ parseHeader = do
                                  parseFont _ = do h <- getWord8
                                                   w <- getWord8
                                                   return (w, h)
-                                 in parseFont zVersion
+                                 in parseFont (zVersionToInt zVersion)
 
   routinesOffset <- getWord16be
   staticStringsOffset <- getWord16be
@@ -91,11 +128,45 @@ parseHeader = do
 
   let fileLength = scale (fromIntegral rawFileLength) where
         scale :: Word32 -> Word32
-        scale x | zVersion < 4 = x * 2
-        scale x | zVersion < 6 = x * 4
+        scale x | (zVersionToInt zVersion) < 4 = x * 2
+        scale x | (zVersionToInt zVersion) < 6 = x * 4
         scale x = x * 8
 
   return $ Header { .. }
+
+
+data Header = Header { zVersion :: !ZVersion
+                     , flags1 :: !Flags1   -- Mutable
+                     , releaseNumber :: !Word16
+                     , baseHighMemory :: !ByteAddress
+                     , initPC :: !Word16   -- Packed address in V6
+                     , dictionaryOffset :: !ByteAddress
+                     , objectTable :: !ByteAddress
+                     , variablesTable :: !ByteAddress
+                     , baseStaticMemory :: !ByteAddress
+                     , flags2 :: !Flags2   -- Mutable
+                     , serialCode :: !B.ByteString
+                     , abbreviationTableOffset :: !ByteAddress
+                     , fileLength :: !Word32
+                     , checksum :: !Word16
+                     , interpreterNumber :: !Word8
+                     , interpreterVersion :: !Word8
+                     , screenHeightLines :: !Word8
+                     , screenWidthChars :: !Word8
+                     , screenWidth :: !Word16 -- units or chars depending on version
+                     , screenHeight :: !Word16
+                     , fontWidth :: !Word8
+                     , fontHeight :: !Word8
+                     , routinesOffset :: !Word16
+                     , staticStringsOffset :: !Word16
+                     , backgroundColour :: !Colour -- Mutable
+                     , foregroundColour :: !Colour -- Mutable
+                     , endCharacterTable :: !ByteAddress
+                     , stream3OutputPixels :: !Word16 -- Mutable
+                     , revisionNumber :: !Word16 -- Mutable
+                     , alphabetTable :: !ByteAddress
+                     , extensionTable :: !ByteAddress
+                     } deriving Show
 
 
 instance Display Header where

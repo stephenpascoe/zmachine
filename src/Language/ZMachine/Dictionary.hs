@@ -6,19 +6,20 @@ Functions here may throw ZsciiException on data that cannot be handled.
 module Language.ZMachine.Dictionary
   ( HasDictionary(..)
   , Dictionary(..)
+  , DictionaryHeader(..)
     --
   , decodeWordEntries
   ) where
 
 import RIO
 
-import qualified RIO.Text as T
 import Data.Binary.Get
+import qualified RIO.ByteString as B
 
 import qualified Language.ZMachine.Memory as M
 import qualified Language.ZMachine.ZSCII as Z
 import Language.ZMachine.App (App)
-import Language.ZMachine.Types
+
 
 
 class HasDictionary env where
@@ -26,14 +27,26 @@ class HasDictionary env where
 
 instance HasDictionary App where
   getDictionary = do header <- M.getHeader
-                     let dictOffset = dictionaryOffset header
-                         version = zVersion header
+                     let dictOffset = M.dictionaryOffset header
+                         version = M.zVersion header
                          aTable = Nothing
                      stream <- M.streamBytes (fromIntegral dictOffset)
                      return $ runGet (decodeDictionary version aTable) stream
 
 
-decodeDictionary :: Version -> Maybe AbbreviationTable -> Get Dictionary
+
+data DictionaryHeader = DictionaryHeader { inputCodes :: !B.ByteString
+                                         , entryLength :: !Int
+                                         , numEntries :: !Int
+                                         } deriving Show
+
+data Dictionary = Dictionary { header :: !DictionaryHeader
+                             , entries :: ![Z.ZsciiString]
+                             } deriving Show
+
+
+
+decodeDictionary :: M.ZVersion -> Maybe Z.AbbreviationTable -> Get Dictionary
 decodeDictionary version aTable = do
   dHeader <- decodeDictionaryHeader
   rawEntries <- decodeWordEntries version dHeader
@@ -51,11 +64,11 @@ decodeDictionaryHeader = do n <- getWord8
                                                       }
 
 
-decodeWordEntries :: Version -> DictionaryHeader -> Get [ZString]
+decodeWordEntries :: M.ZVersion -> DictionaryHeader -> Get [Z.ZString]
 decodeWordEntries v h = let nmax = numEntries h
-                            zlen = if v < 4 then 4 else 6
+                            zlen = if (M.zVersionToInt v) < 4 then 4 else 6
                             f n | n >= nmax = return []
-                            f n = do zstr <- ZString <$> getByteString zlen
+                            f n = do zstr <- Z.ZString <$> getByteString zlen
                                      skip $ (entryLength h) - zlen
                                      rest <- f (n+1)
                                      return $ zstr:rest
@@ -64,6 +77,6 @@ decodeWordEntries v h = let nmax = numEntries h
 
 instance Display Dictionary where
   display dict = mconcat entryBs where
-    buildEntry :: (Integer, ZsciiString) -> Utf8Builder
+    buildEntry :: (Integer, Z.ZsciiString) -> Utf8Builder
     buildEntry (i, zseq) = "[" <> (display i) <> "] " <> (display (Z.zseqToText zseq)) <> "\n"
     entryBs = map buildEntry $ zip [0..] (entries dict)

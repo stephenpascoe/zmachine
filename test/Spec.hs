@@ -11,7 +11,7 @@ import Data.Word
 import RIO.ByteString as B
 import RIO.List as L
 
-import Language.ZMachine.Types
+import Language.ZMachine.Memory
 import Language.ZMachine.ZSCII.ZChars
 import Language.ZMachine.ZSCII.Parsec
 
@@ -63,8 +63,8 @@ main = hspec $ do
                            0 -> zchars == []
                            1 -> zchars == []
                            _ -> L.length zchars > 0
-    it "A padding word is ignored" $ do
-      decodeZString 1 Nothing (zcharsToZstr [5, 5, 5]) `shouldBe` (ZsciiString "")
+    it "A padding word is ignored" $
+      decodeZString ZVer1 Nothing (zcharsToZstr [5, 5, 5]) `shouldBe` (ZsciiString "")
 
 
     -- TODO : test stop-bit logic

@@ -10,23 +10,55 @@ a sequence of (for example) 4's would work equally well.
 
 -}
 module Language.ZMachine.ZSCII.ZChars
- ( zstrToZchars
- , zcharsToZstr
- -- Internal
- , packZchars
- , unpackZchars
- , hasStopBit
- ) where
+  ( zstrToZchars
+  , zcharsToZstr
+  , ZString(..)
+  , ZsciiString(..)
+  , Zscii
+  , ZChar
+  , AbbreviationTable
+  -- Internal
+  , packZchars
+  , unpackZchars
+  , hasStopBit
+) where
 
 import RIO
 
 import qualified RIO.ByteString.Lazy as BL
+import qualified RIO.ByteString as B
+import qualified RIO.Vector.Boxed as V
 import Data.Bits
 import Data.Binary.Put
 import Data.Binary.Get
 import Data.Binary
 
-import Language.ZMachine.Types
+{-
+
+We need to represent 4 different forms of character data
+
+ 1. The on-disk encoding of strings as documented in the spec.  This is represented
+    as a strict ByteString wrapped in the ZString newtype
+ 2. A sequence of ZChars.  A ZChar is a integer between 0 and 31.  ZChars are respresented
+    as lists of Word8
+ 3. ZsciiString.  A byte encoding similar to latin1 referred to as ZSCII chars in the spec.  Represented as a newtype of ByteString.
+ 4. Text.  For final output.
+
+-}
+
+-- | Characters
+type Zscii = Word8
+type ZChar = Word8
+
+-- | A ByteString representing ZString encoded characters
+newtype ZString = ZString { unZString :: B.ByteString } deriving (Show, Eq)
+
+
+-- | A ByteString representing a decoded ZString into a squence of Zscii charaters
+newtype ZsciiString = ZsciiString { unZsciiString :: B.ByteString } deriving (Show, Eq)
+
+type AbbreviationTable = V.Vector ZsciiString
+
 
 paddingChar :: ZChar
 paddingChar = 5
