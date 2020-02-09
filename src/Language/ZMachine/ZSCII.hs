@@ -4,13 +4,14 @@ module Language.ZMachine.ZSCII
   , ZsciiString
   , ZString(..)
   , AbbreviationTable
-  ) where
+  )
+where
 
-import qualified Data.Text.Encoding as TE
-import qualified RIO.Text as T
+import qualified Data.Text.Encoding            as TE
+import qualified RIO.Text                      as T
 
-import Language.ZMachine.ZSCII.Parsec
-import Language.ZMachine.ZSCII.ZChars
+import           Language.ZMachine.ZSCII.Parsec
+import           Language.ZMachine.ZSCII.ZChars
 
 zseqToText :: ZsciiString -> T.Text
 zseqToText (ZsciiString bstr) = TE.decodeLatin1 bstr
