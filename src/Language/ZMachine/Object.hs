@@ -128,7 +128,7 @@ readObjectRecs offset = f offset Nothing where
 readPropertyTable :: M.HasMemory env => M.ByteAddress -> RIO env (Z.ZsciiString, [Property])
 readPropertyTable offset = do header <- M.getHeader
                               stream <- M.streamBytes (fromIntegral offset)
-                              return $ runGet (decodePropertyTable (M.zVersion header)) stream
+                              return $ runGet (decodePropertyTable (M.zVersion header) Nothing) stream
 
 
 decodePropertyBlock :: M.ZVersion -> Get (Maybe Property)
@@ -155,22 +155,26 @@ decodePropertyBlock version
                                  return $ Just (Property propNum pdata)
 
 
-decodePropertyHeader :: M.ZVersion -> Get Z.ZsciiString
-decodePropertyHeader version = do size <- getWord8
-                                  zdata <- getByteString (fromIntegral size)
-                                  -- TODO : Abbreviation table support
-                                  return $ Z.decodeZString version Nothing (Z.ZString zdata)
+decodePropertyHeader :: M.ZVersion -> Maybe Z.AbbreviationTable -> Get Z.ZsciiString
+decodePropertyHeader version aTable = do size <- getWord8
+                                         zdata <- getByteString (fromIntegral size)
+                                         -- TODO : Abbreviation table support
+                                         return $ Z.decodeZString version aTable (Z.ZString zdata)
 
-decodePropertyTable :: M.ZVersion -> Get (Z.ZsciiString, [Property])
-decodePropertyTable version = do description <- decodePropertyHeader version
-                                 props <- f version
-                                 return (description, props)
-                                   where
-                                     f v = do mProp <- decodePropertyBlock version
-                                              case mProp of
-                                                   Nothing -> return []
-                                                   Just prop -> do props <- f v
-                                                                   return (prop : props)
+decodePropertyTable
+  :: M.ZVersion -> Maybe Z.AbbreviationTable -> Get (Z.ZsciiString, [Property])
+decodePropertyTable version aTable = do
+  description <- decodePropertyHeader version aTable
+  props       <- f version
+  return (description, props)
+ where
+  f v = do
+    mProp <- decodePropertyBlock version
+    case mProp of
+      Nothing   -> return []
+      Just prop -> do
+        props <- f v
+        return (prop : props)
 
 
 decodeObjectRec :: M.ZVersion -> Get ObjectRec
