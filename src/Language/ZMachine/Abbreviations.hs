@@ -6,20 +6,23 @@ import RIO
 
 import Data.Binary.Get
 import Data.List
+import qualified RIO.Vector.Boxed              as V
+
 
 import qualified Language.ZMachine.Memory as M
-import Language.ZMachine.ZSCII (AbbreviationTable)
+import Language.ZMachine.ZSCII (AbbreviationTable, ZsciiString(..))
 
 getAbbreviations :: M.HasMemory env => RIO env AbbreviationTable
-getAbbreviations = do header <- M.getHeader
-                      let tableOffset = M.abbreviationTableOffset header
-                          tableLength = if (M.zVersionToInt $ M.zVersion header) < 3 then 32 else 96
-                      stream <- M.streamBytes (fromIntegral tableOffset)
-                      let tableOffsets = runGet (decodeTableOffsets tableLength) stream
-                        in
-                        -- TODO : Read ZString from each offset
-                        -- TODO : Convert to vector
-                        undefined
+getAbbreviations = traverse readAbbreviation =<< getTableOffsets
 
-decodeTableOffsets :: Int -> Get [Word16]
-decodeTableOffsets n = sequenceA $ take n $ repeat getWord16be
+getTableOffsets :: M.HasMemory env => RIO env (V.Vector Word16)
+getTableOffsets = do header <- M.getHeader 
+                     let tableOffset = M.abbreviationTableOffset header
+                         tableLength = if M.zVersionToInt (M.zVersion header) < 3 then 32 else 96
+                     stream <- M.streamBytes (fromIntegral tableOffset)
+                     return $ runGet (V.replicateM tableLength getWord16be) stream
+
+readAbbreviation :: M.HasMemory env => Word16 -> RIO env ZsciiString 
+readAbbreviation tableOffset = 
+  do stream <- M.streamBytes (fromIntegral tableOffset)
+     return $ ZsciiString "x"

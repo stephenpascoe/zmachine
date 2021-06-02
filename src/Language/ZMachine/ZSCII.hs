@@ -1,7 +1,7 @@
 module Language.ZMachine.ZSCII
   ( decodeZString
   , zseqToText
-  , ZsciiString
+  , ZsciiString(..)
   , ZString(..)
   , AbbreviationTable
   )

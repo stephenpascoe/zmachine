@@ -15,6 +15,7 @@ import           Hexdump                        ( simpleHex )
 import qualified Language.ZMachine.Memory      as M
 import qualified Language.ZMachine.ZSCII       as Z
 import           Language.ZMachine.App          ( App )
+import Language.ZMachine.Abbreviations ( getAbbreviations ) 
 
 import           Data.Binary.Get
 import           Data.Bits
@@ -160,9 +161,9 @@ readPropertyTable
 readPropertyTable offset = do
   header <- M.getHeader
   stream <- M.streamBytes (fromIntegral offset)
-  -- TODO : Parse AbbreviationTable
-  aTable <- _
-  return $ runGet (decodePropertyTable (M.zVersion header) Nothing) stream
+  -- TODO : Parse AbbreviationTable, Strore in env
+  aTable <- getAbbreviations
+  return $ runGet (decodePropertyTable (M.zVersion header) (Just aTable)) stream
 
 
 decodePropertyBlock :: M.ZVersion -> Get (Maybe Property)

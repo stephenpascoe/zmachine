@@ -6,6 +6,7 @@ import           Language.ZMachine.App
 import qualified Language.ZMachine.Memory      as M
 import qualified Language.ZMachine.Dictionary  as D
 import qualified Language.ZMachine.Object      as OB
+import qualified Language.ZMachine.Abbreviations as A
 import           System.Environment             ( getArgs )
 
 import qualified RIO.List                      as L
@@ -22,9 +23,11 @@ main = do
 runApp :: RIO App a -> IO (Maybe a)
 runApp action = do
   logOptions' <- logOptionsHandle stdout False
+
   withLogFunc logOptions' $ \logFunc -> do
     args <- liftIO $ getArgs
     let mStoryFile = L.headMaybe args
+
     case mStoryFile of
       Nothing -> do
         B.putStr "No story file specified\n"
@@ -39,7 +42,10 @@ dump :: RIO App ()
 dump = do
   dict    <- D.getDictionary
   header  <- M.getHeader
+  abbreviations <- A.getAbbreviations
   objects <- OB.getObjects
+
   logInfo . display $ header
+  logInfo . display $ "AbbreviationTable " <> (displayShow abbreviations)
   logInfo . display $ dict
   logInfo . display $ objects
