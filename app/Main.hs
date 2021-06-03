@@ -46,5 +46,6 @@ dump = do
     objects       <- OB.getObjects
 
     logInfo . display $ header
-    logInfo . display $ dict
-    logInfo . display $ objects
+    -- logInfo . display $ dict
+    -- logInfo . display $ objects
+    logInfo . OB.displayObjectTree $ OB.makeObjectTree objects
