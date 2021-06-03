@@ -8,7 +8,6 @@ where
 import           RIO
 
 import           Data.Binary.Get
-import           Data.List
 import qualified RIO.Vector.Boxed              as V
 import qualified Language.ZMachine.ZSCII       as Z
 
@@ -18,7 +17,6 @@ import qualified Language.ZMachine.Memory      as M
 import           Language.ZMachine.ZSCII        ( AbbreviationTable
                                                 , ZsciiString
                                                 , decodeZString
-                                                , ZsciiException
                                                 )
 import           Language.ZMachine.App          ( App )
 

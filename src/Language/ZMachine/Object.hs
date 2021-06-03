@@ -12,6 +12,7 @@ import qualified RIO.ByteString                as B
 import qualified RIO.ByteString.Lazy           as BL
 import qualified RIO.Vector.Boxed              as V
 import           Hexdump                        ( simpleHex )
+import           Text.Printf                    ( printf )
 
 import qualified Language.ZMachine.Memory      as M
 import qualified Language.ZMachine.ZSCII       as Z
@@ -24,7 +25,6 @@ import           Language.ZMachine.Abbreviations
 import           Data.Binary.Get
 import           Data.Bits
 
--- TODO : Default properties table
 -- TODO : buildTree
 
 class HasObjects env where
@@ -79,11 +79,15 @@ instance Display Object where
         props = mconcat (fmap f (properties obj))
         f prop = "  " <> display prop <> "\n"
 
--- TODO : Display defaults?
 instance Display ObjectTable where
-    display (ObjectTable propDefaults objs) = mconcat
-        (f <$> zip [(1 :: Int) ..] (V.toList objs))
-        where f (i, obj) = display i <> ". " <> display obj <> "\n"
+    display (ObjectTable propDefaults objs) =
+        "Property Defaults: "
+            <> mconcat (g <$> V.toList propDefaults)
+            <> "\n\n"
+            <> mconcat (f <$> zip [(1 :: Int) ..] (V.toList objs))
+      where
+        f (i, obj) = display i <> ". " <> display obj <> "\n"
+        g pd = display ((T.pack . printf "%04x") pd) <> ", "
 
 -- Slightly different representation of Object, useful during decoding
 data ObjectRec = ObjectRec
