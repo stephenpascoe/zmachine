@@ -15,7 +15,7 @@ import qualified RIO.ByteString.Lazy           as BL
 import qualified RIO.Vector.Boxed              as V
 import           Hexdump                        ( simpleHex )
 import           Text.Printf                    ( printf )
-import          Data.List                      ( intersperse )
+import           Data.List                      ( intersperse )
 
 import qualified Language.ZMachine.Memory      as M
 import qualified Language.ZMachine.ZSCII       as Z
@@ -54,7 +54,8 @@ type PropertyDefaults = V.Vector Word16
 data ObjectTable = ObjectTable PropertyDefaults (V.Vector Object)
 
 newtype ObjectRoots = ObjectRoots [ObjectTree]
-data ObjectTree = ObjectTree Object [ObjectTree] deriving Show
+data ObjectTree = ObjectTree Object [ObjectTree]
+    deriving Show
 
 instance Display Property where
     display (Property n propData) =
@@ -105,23 +106,27 @@ data ObjectRec = ObjectRec
 
 
 makeObjectTree :: ObjectTable -> ObjectRoots
-makeObjectTree (ObjectTable _defaults table) = ObjectRoots $ toTree <$> filter isRootObject (V.toList table) where
-  toTree obj = ObjectTree obj (siblings (childId obj))
-  isRootObject obj = parentId obj == 0
-  siblings 0 = []
-  siblings n = let mObj = table V.!? (fromIntegral n - 1) in
-                case mObj of
-                  Just obj -> toTree obj : siblings (siblingId obj)
-                  Nothing -> []
+makeObjectTree (ObjectTable _defaults table) = ObjectRoots $ toTree <$> filter
+    isRootObject
+    (V.toList table)  where
+    toTree obj = ObjectTree obj (siblings (childId obj))
+    isRootObject obj = parentId obj == 0
+    siblings 0 = []
+    siblings n =
+        let mObj = table V.!? (fromIntegral n - 1)
+        in  case mObj of
+                Just obj -> toTree obj : siblings (siblingId obj)
+                Nothing  -> []
 
 displayObjectTree :: ObjectRoots -> Utf8Builder
-displayObjectTree (ObjectRoots roots) = (mconcat . intersperse "\n" . fmap (displayTree 0)) roots where
-  displayTree indent (ObjectTree obj children)
-    =  mconcat (replicate indent "  ")
-    <> "+ "
-    <> display (Z.zseqToText $ description obj)
-    <> "\n"
-    <> mconcat (fmap (displayTree (indent + 1)) children)
+displayObjectTree (ObjectRoots roots) =
+    (mconcat . intersperse "\n" . fmap (displayTree 0)) roots  where
+    displayTree indent (ObjectTree obj children) =
+        mconcat (replicate indent "  ")
+            <> "+ "
+            <> display (Z.zseqToText $ description obj)
+            <> "\n"
+            <> mconcat (fmap (displayTree (indent + 1)) children)
 
 
 {-
