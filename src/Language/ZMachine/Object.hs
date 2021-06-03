@@ -105,7 +105,8 @@ readObjects = do
     header <- M.getHeader
     let offset = M.objectTable header
     stream <- M.streamBytes (fromIntegral offset)
-    let (propDefaults, objRecs) = runGet (decodeObjectTable (M.zVersion header) offset) stream
+    let (propDefaults, objRecs) =
+            runGet (decodeObjectTable (M.zVersion header) offset) stream
     properties <- traverse f objRecs
     return $ ObjectTable propDefaults
                          (V.fromList $ zipWith g objRecs properties)
@@ -122,11 +123,12 @@ readObjects = do
 
 
 
-decodeObjectTable :: M.ZVersion -> M.ByteAddress -> Get (PropertyDefaults, [ObjectRec])
+decodeObjectTable
+    :: M.ZVersion -> M.ByteAddress -> Get (PropertyDefaults, [ObjectRec])
 decodeObjectTable version offset = do
-  propDefaults <- decodePropertyDefaults version
-  objRecs <- decodeObjectRecs version offset Nothing 
-  return (propDefaults, objRecs)
+    propDefaults <- decodePropertyDefaults version
+    objRecs      <- decodeObjectRecs version offset Nothing
+    return (propDefaults, objRecs)
 
 decodeObjectRec :: M.ZVersion -> Get ObjectRec
 decodeObjectRec version
@@ -154,26 +156,25 @@ decodeObjectRec version
 
 
 decodePropertyDefaults :: M.ZVersion -> Get PropertyDefaults
-decodePropertyDefaults v | M.zVersionToInt v < 4 =
-  V.replicateM 31 getWord16be
-decodePropertyDefaults _ =
-  V.replicateM 63 getWord16be
+decodePropertyDefaults v | M.zVersionToInt v < 4 = V.replicateM 31 getWord16be
+decodePropertyDefaults _                         = V.replicateM 63 getWord16be
 
 decodeObjectRecs
-  :: M.ZVersion -- ^ Interpreter version
-  -> M.ByteAddress -- ^ Address of start of objects
-  -> Maybe M.ByteAddress -- ^ Maxumum end of objects
-  -> Get [ObjectRec] -- ^ All Object records
-decodeObjectRecs v start mEnd =
-  do pos <- bytesRead
-     orec <- decodeObjectRec v
-     let end = case mEnd of
-                  Just end' -> min end' (propertyAddr' orec)
-                  Nothing -> propertyAddr' orec
-     if fromIntegral pos + start >= end
-       then return []
-       else do rest <- decodeObjectRecs v start (Just end)
-               return (orec : rest)
+    :: M.ZVersion -- ^ Interpreter version
+    -> M.ByteAddress -- ^ Address of start of objects
+    -> Maybe M.ByteAddress -- ^ Maxumum end of objects
+    -> Get [ObjectRec] -- ^ All Object records
+decodeObjectRecs v start mEnd = do
+    pos  <- bytesRead
+    orec <- decodeObjectRec v
+    let end = case mEnd of
+            Just end' -> min end' (propertyAddr' orec)
+            Nothing   -> propertyAddr' orec
+    if fromIntegral pos + start >= end
+        then return []
+        else do
+            rest <- decodeObjectRecs v start (Just end)
+            return (orec : rest)
 
 
 readPropertyTable
@@ -184,14 +185,11 @@ readPropertyTable offset = do
     header <- M.getHeader
     stream <- M.streamBytes (fromIntegral offset)
     aTable <- getAbbreviationTable
-    return $ runGet (decodePropertyTable (M.zVersion header) aTable)
-                    stream
+    return $ runGet (decodePropertyTable (M.zVersion header) aTable) stream
 
 
 decodePropertyTable
-    :: M.ZVersion
-    -> Z.AbbreviationTable
-    -> Get (Z.ZsciiString, [Property])
+    :: M.ZVersion -> Z.AbbreviationTable -> Get (Z.ZsciiString, [Property])
 decodePropertyTable version aTable = do
     description <- decodePropertyHeader version aTable
     props       <- f version
@@ -207,14 +205,13 @@ decodePropertyTable version aTable = do
 
 
 
-decodePropertyHeader
-    :: M.ZVersion -> Z.AbbreviationTable -> Get Z.ZsciiString
+decodePropertyHeader :: M.ZVersion -> Z.AbbreviationTable -> Get Z.ZsciiString
 decodePropertyHeader version aTable = do
     size  <- getWord8
     zdata <- getByteString (fromIntegral size * 2)
     case Z.decodeZString version (Just aTable) (BL.fromStrict zdata) of
-      Left e -> fail $ T.unpack e
-      Right zscii -> return zscii
+        Left  e     -> fail $ T.unpack e
+        Right zscii -> return zscii
 
 
 decodePropertyBlock :: M.ZVersion -> Get (Maybe Property)

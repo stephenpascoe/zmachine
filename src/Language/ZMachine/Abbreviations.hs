@@ -47,8 +47,8 @@ readAbbreviation tableOffset = do
     stream <- M.streamBytes (2 * fromIntegral tableOffset)
     -- We assume abbreviations do not contain references to abbreviations
     case decodeZString version Nothing stream of
-      Left e -> throwIO $ Z.ZsciiException e
-      Right zstr -> return zstr
+        Left  e    -> throwIO $ Z.ZsciiException e
+        Right zstr -> return zstr
 
 
 

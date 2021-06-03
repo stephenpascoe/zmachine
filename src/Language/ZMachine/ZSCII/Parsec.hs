@@ -53,7 +53,11 @@ foldTokens toks = ZsciiString $ foldl' f "" toks  where
     f acc (AbrevToken (ZsciiString abrev)) = B.append acc abrev
     f acc (ZCharToken zchar              ) = B.snoc acc zchar
 
-zcharsToZscii :: M.ZVersion -> Maybe AbbreviationTable -> [ZChar] -> ZsciiResult ZsciiString
+zcharsToZscii
+    :: M.ZVersion
+    -> Maybe AbbreviationTable
+    -> [ZChar]
+    -> ZsciiResult ZsciiString
 zcharsToZscii version aTable zchars =
     let
         parseZstring :: ZsciiParsec ZsciiString
@@ -163,19 +167,25 @@ zcharsToZscii version aTable zchars =
         abbrev x = do
             z <- anyChar
             case getAbbreviation aTable x z of
-              Left e -> fail $ T.unpack e
-              Right tok -> return tok
+                Left  e   -> fail $ T.unpack e
+                Right tok -> return tok
     in
         case runParser parseZstring Alpha0 "ZString decoder" zchars of
             -- Left  e     -> Left $ T.pack (show e)
-            Left _ -> Right "-ERROR-"
+            Left  _     -> Right "-ERROR-"
             Right zscii -> Right zscii
 
 
-getAbbreviation :: Maybe AbbreviationTable -> ZChar -> ZChar -> ZsciiResult Token
-getAbbreviation Nothing _ _ =
-    Left "No abbreviations available"
+getAbbreviation
+    :: Maybe AbbreviationTable -> ZChar -> ZChar -> ZsciiResult Token
+getAbbreviation Nothing _ _ = Left "No abbreviations available"
 
-getAbbreviation (Just t) a b = case t !? (((fromIntegral a - 1) * 32) + fromIntegral b) of
-    Nothing -> Left ("Abbreviation index out of range : " <> (T.pack . show $ a) <> " " <> (T.pack . show $ b))
-    Just x  -> Right $ AbrevToken x
+getAbbreviation (Just t) a b =
+    case t !? (((fromIntegral a - 1) * 32) + fromIntegral b) of
+        Nothing -> Left
+            (  "Abbreviation index out of range : "
+            <> (T.pack . show $ a)
+            <> " "
+            <> (T.pack . show $ b)
+            )
+        Just x -> Right $ AbrevToken x

@@ -86,8 +86,8 @@ decodeWordEntries v a h =
             skip $ entryLength h - zlen
             rest <- f (n + 1)
             case Z.decodeZString v a (BL.fromStrict zstr) of
-              Left e -> fail $ T.unpack e
-              Right zscii -> return $ zscii : rest
+                Left  e     -> fail $ T.unpack e
+                Right zscii -> return $ zscii : rest
     in  f 0
 
 
