@@ -9,13 +9,15 @@ where
 import           RIO
 import qualified RIO.Text                      as T
 import qualified RIO.ByteString                as B
+import qualified RIO.ByteString.Lazy           as BL
 import qualified RIO.Vector.Boxed              as V
 import           Hexdump                        ( simpleHex )
 
 import qualified Language.ZMachine.Memory      as M
 import qualified Language.ZMachine.ZSCII       as Z
+import qualified Language.ZMachine.Abbreviations       as A
 import           Language.ZMachine.App          ( App )
-import Language.ZMachine.Abbreviations ( getAbbreviations ) 
+import Language.ZMachine.Abbreviations ( getAbbreviationTable ) 
 
 import           Data.Binary.Get
 import           Data.Bits
@@ -91,7 +93,7 @@ data ObjectRec = ObjectRec
   }
 
 
-readObjects :: M.HasMemory env => RIO env ObjectTable
+readObjects :: (M.HasMemory env, A.HasAbbreviations env) => RIO env ObjectTable
 readObjects = do
   header <- M.getHeader
   let offset = M.objectTable header
@@ -157,12 +159,12 @@ readObjectRecs offset = f offset Nothing where
 
 
 readPropertyTable
-  :: M.HasMemory env => M.ByteAddress -> RIO env (Z.ZsciiString, [Property])
+  :: (M.HasMemory env, A.HasAbbreviations env) => M.ByteAddress -> RIO env (Z.ZsciiString, [Property])
 readPropertyTable offset = do
   header <- M.getHeader
   stream <- M.streamBytes (fromIntegral offset)
   -- TODO : Parse AbbreviationTable, Strore in env
-  aTable <- getAbbreviations
+  aTable <- getAbbreviationTable
   return $ runGet (decodePropertyTable (M.zVersion header) (Just aTable)) stream
 
 
@@ -202,7 +204,7 @@ decodePropertyHeader version aTable = do
   size  <- getWord8
   zdata <- getByteString (fromIntegral size)
   -- TODO : Abbreviation table support
-  return $ Z.decodeZString version aTable (Z.ZString zdata)
+  return $ Z.decodeZString version aTable (BL.fromStrict zdata)
 
 decodePropertyTable
   :: M.ZVersion -> Maybe Z.AbbreviationTable -> Get (Z.ZsciiString, [Property])

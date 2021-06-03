@@ -16,6 +16,7 @@ import           RIO
 
 import           Data.Binary.Get
 import qualified RIO.ByteString                as B
+import qualified RIO.ByteString.Lazy           as BL
 
 import qualified Language.ZMachine.Memory      as M
 import qualified Language.ZMachine.ZSCII       as Z
@@ -55,8 +56,7 @@ data Dictionary = Dictionary
 decodeDictionary :: M.ZVersion -> Maybe Z.AbbreviationTable -> Get Dictionary
 decodeDictionary version aTable = do
   dHeader    <- decodeDictionaryHeader
-  rawEntries <- decodeWordEntries version dHeader
-  let entries = fmap (Z.decodeZString version aTable) rawEntries
+  entries <- decodeWordEntries version aTable dHeader
   return $ Dictionary dHeader entries
 
 decodeDictionaryHeader :: Get DictionaryHeader
@@ -71,16 +71,16 @@ decodeDictionaryHeader = do
                             }
 
 
-decodeWordEntries :: M.ZVersion -> DictionaryHeader -> Get [Z.ZString]
-decodeWordEntries v h =
+decodeWordEntries :: M.ZVersion -> Maybe Z.AbbreviationTable -> DictionaryHeader -> Get [Z.ZsciiString]
+decodeWordEntries v a h =
   let nmax = numEntries h
-      zlen = if (M.zVersionToInt v) < 4 then 4 else 6
+      zlen = if M.zVersionToInt v < 4 then 4 else 6
       f n | n >= nmax = return []
       f n             = do
-        zstr <- Z.ZString <$> getByteString zlen
-        skip $ (entryLength h) - zlen
+        zstr <- getByteString zlen
+        skip $ entryLength h - zlen
         rest <- f (n + 1)
-        return $ zstr : rest
+        return $ Z.decodeZString v a (BL.fromStrict zstr) : rest
   in  f 0
 
 
@@ -88,5 +88,5 @@ instance Display Dictionary where
   display dict = mconcat entryBs   where
     buildEntry :: (Integer, Z.ZsciiString) -> Utf8Builder
     buildEntry (i, zseq) =
-      "[" <> (display i) <> "] " <> (display (Z.zseqToText zseq)) <> "\n"
-    entryBs = map buildEntry $ zip [0 ..] (entries dict)
+      "[" <> display i <> "] " <> display (Z.zseqToText zseq) <> "\n"
+    entryBs = zipWith (curry buildEntry) [0 ..] (entries dict)

@@ -7,6 +7,7 @@ module Language.ZMachine.ZSCII
   )
 where
 
+import RIO
 import qualified Data.Text.Encoding            as TE
 import qualified RIO.Text                      as T
 

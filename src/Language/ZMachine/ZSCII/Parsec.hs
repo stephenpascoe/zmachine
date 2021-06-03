@@ -39,6 +39,7 @@ getAlphabetTable _       Alpha1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 getAlphabetTable _       Alpha2 = "^\n0123456789.,!?_#'\"/\\-:()"
 
 
+-- TODO :: Convert to HasAbbreviations 
 decodeZString
   :: M.ZVersion                -- ^ ZMachine version
   -> Maybe AbbreviationTable   -- ^ Abbreviations, if available
@@ -170,8 +171,8 @@ zcharsToZscii version aTable zchars =
 
 getAbbreviation :: Maybe AbbreviationTable -> Int -> ZChar -> Token
 getAbbreviation Nothing _ _ =
-  impureThrow $ ZsciiException "No abbreviations available"
--- TODO : When we see some abrevations, implement this
+  -- impureThrow $ ZsciiException "No abbreviations available"
+  AbrevToken "-"
 
 getAbbreviation (Just t) a b = case t !? ((a * 32) + fromIntegral b) of
   Nothing -> impureThrow $ ZsciiException "Abbreviation index out of range"
