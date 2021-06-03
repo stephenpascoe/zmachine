@@ -1,6 +1,6 @@
 module Language.ZMachine.App
-  ( App(..)
-  )
+    ( App(..)
+    )
 where
 
 import           RIO
@@ -13,9 +13,9 @@ import qualified RIO.ByteString                as B
 --
 
 data App = App
-  { appLogger :: !LogFunc
-  , story     :: !B.ByteString
-  }
+    { appLogger :: !LogFunc
+    , story     :: !B.ByteString
+    }
 
 instance HasLogFunc App where
-  logFuncL = lens appLogger (\x y -> x { appLogger = y })
+    logFuncL = lens appLogger (\x y -> x { appLogger = y })

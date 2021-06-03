@@ -10,17 +10,17 @@ a sequence of (for example) 4's would work equally well.
 
 -}
 module Language.ZMachine.ZSCII.ZChars
-  ( zstrToZchars
-  , zcharsToZstr
-  , ZString
-  , ZsciiString(..)
-  , ZChar
-  , AbbreviationTable
+    ( zstrToZchars
+    , zcharsToZstr
+    , ZString
+    , ZsciiString(..)
+    , ZChar
+    , AbbreviationTable
   -- Internal
-  , packZchars
-  , unpackZchars
-  , hasStopBit
-  )
+    , packZchars
+    , unpackZchars
+    , hasStopBit
+    )
 where
 
 import           RIO
@@ -81,33 +81,33 @@ zcharsToZstr zchars = runPut (encodeZchars zchars)
 
 
 decodeZchars :: Get [ZChar]
-decodeZchars = decodeWords <|> return [] where
-  decodeWords = do
-    w <- getWord16be
-    let (z1, z2, z3) = unpackZchars w
-    if hasStopBit w
-      then return [z1, z2, z3]
-      else do
-        zchars <- decodeZchars
-        return (z1 : z2 : z3 : zchars)
+decodeZchars = decodeWords <|> return []  where
+    decodeWords = do
+        w <- getWord16be
+        let (z1, z2, z3) = unpackZchars w
+        if hasStopBit w
+            then return [z1, z2, z3]
+            else do
+                zchars <- decodeZchars
+                return (z1 : z2 : z3 : zchars)
 
 
 encodeZchars :: [ZChar] -> Put
 encodeZchars [z1, z2, z3] = do
-  let word = addStopBit $ packZchars (z1, z2, z3)
-  put word
+    let word = addStopBit $ packZchars (z1, z2, z3)
+    put word
 
 encodeZchars [z1, z2] = do
-  let word = addStopBit $ packZchars (z1, z2, paddingChar)
-  put word
+    let word = addStopBit $ packZchars (z1, z2, paddingChar)
+    put word
 
 encodeZchars [z1] = do
-  let word = addStopBit $ packZchars (z1, paddingChar, paddingChar)
-  put word
+    let word = addStopBit $ packZchars (z1, paddingChar, paddingChar)
+    put word
 encodeZchars (z1 : z2 : z3 : rest) = do
-  let word = packZchars (z1, z2, z3)
-  put word
-  encodeZchars rest
+    let word = packZchars (z1, z2, z3)
+    put word
+    encodeZchars rest
 encodeZchars [] = return ()
 
 hasStopBit :: Word16 -> Bool
@@ -118,16 +118,14 @@ addStopBit w = w .|. 0x8000
 
 
 unpackZchars :: Word16 -> (ZChar, ZChar, ZChar)
-unpackZchars w = (z1, z2, z3) where
-  mask' = 0x001f
-  w'    = w .&. 0x7fff
-  z1    = fromIntegral $ w' `shift` (-10) .&. mask'
-  z2    = fromIntegral $ w' `shift` (-5) .&. mask'
-  z3    = fromIntegral $ w' .&. mask'
+unpackZchars w = (z1, z2, z3)  where
+    mask' = 0x001f
+    w'    = w .&. 0x7fff
+    z1    = fromIntegral $ w' `shift` (-10) .&. mask'
+    z2    = fromIntegral $ w' `shift` (-5) .&. mask'
+    z3    = fromIntegral $ w' .&. mask'
 
 
 packZchars :: (ZChar, ZChar, ZChar) -> Word16
 packZchars (z1, z2, z3) =
-  fromIntegral z3
-    .|. fromIntegral z2 `shift` 5
-    .|. fromIntegral z1 `shift` 10
+    fromIntegral z3 .|. fromIntegral z2 `shift` 5 .|. fromIntegral z1 `shift` 10

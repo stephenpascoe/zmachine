@@ -1,13 +1,13 @@
 module Language.ZMachine.ZSCII
-  ( decodeZString
-  , zseqToText
-  , ZsciiString(..)
-  , ZString(..)
-  , AbbreviationTable
-  )
+    ( decodeZString
+    , zseqToText
+    , ZsciiString(..)
+    , ZString(..)
+    , AbbreviationTable
+    )
 where
 
-import RIO
+import           RIO
 import qualified Data.Text.Encoding            as TE
 import qualified RIO.Text                      as T
 
