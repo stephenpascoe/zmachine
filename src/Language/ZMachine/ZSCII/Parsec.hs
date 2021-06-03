@@ -164,7 +164,7 @@ zcharsToZscii version aTable zchars =
         restOfInput = many anyChar *> pure EmptyToken
 
         -- Abbreviation parser
-        abbrev :: Int -> ZsciiParsec Token
+        abbrev :: ZChar -> ZsciiParsec Token
         abbrev x = do
             z <- anyChar
             return $ getAbbreviation aTable x z
@@ -174,11 +174,11 @@ zcharsToZscii version aTable zchars =
             Right zscii -> zscii
 
 
-getAbbreviation :: Maybe AbbreviationTable -> Int -> ZChar -> Token
+getAbbreviation :: Maybe AbbreviationTable -> ZChar -> ZChar -> Token
 getAbbreviation Nothing _ _ =
   -- impureThrow $ ZsciiException "No abbreviations available"
     AbrevToken "-"
 
-getAbbreviation (Just t) a b = case t !? ((a * 32) + fromIntegral b) of
-    Nothing -> impureThrow $ ZsciiException "Abbreviation index out of range"
+getAbbreviation (Just t) a b = case t !? (((fromIntegral a - 1) * 32) + fromIntegral b) of
+    Nothing -> impureThrow $ ZsciiException ("Abbreviation index out of range : " <> (T.pack . show $ a) <> " " <> (T.pack . show $ b))
     Just x  -> AbrevToken x
