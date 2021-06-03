@@ -47,9 +47,5 @@ dump = do
     objects       <- OB.getObjects
 
     logInfo . display $ header
-    logInfo
-        .  display
-        $  "AbbreviationTable "
-        <> (A.displayAbbreviations abbreviations)
-  -- logInfo . display $ dict
+    logInfo . display $ dict
   -- logInfo . display $ objects
