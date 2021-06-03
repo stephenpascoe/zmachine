@@ -42,7 +42,8 @@ readAbbreviation :: M.HasMemory env => Word16 -> RIO env ZsciiString
 readAbbreviation tableOffset = do
     header <- M.getHeader
     let version = M.zVersion header
-    stream <- M.streamBytes (fromIntegral tableOffset)
+    -- Note : Word address therefore *2
+    stream <- M.streamBytes (2 * fromIntegral tableOffset)
     -- We assume abbreviations do not contain references to abbreviations
     return $ decodeZString version Nothing stream
 
