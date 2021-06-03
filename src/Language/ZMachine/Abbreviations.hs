@@ -18,6 +18,7 @@ import qualified Language.ZMachine.Memory      as M
 import           Language.ZMachine.ZSCII        ( AbbreviationTable
                                                 , ZsciiString
                                                 , decodeZString
+                                                , ZsciiException
                                                 )
 import           Language.ZMachine.App          ( App )
 
@@ -45,7 +46,9 @@ readAbbreviation tableOffset = do
     -- Note : Word address therefore *2
     stream <- M.streamBytes (2 * fromIntegral tableOffset)
     -- We assume abbreviations do not contain references to abbreviations
-    return $ decodeZString version Nothing stream
+    case decodeZString version Nothing stream of
+      Left e -> throwIO $ Z.ZsciiException e
+      Right zstr -> return zstr
 
 
 

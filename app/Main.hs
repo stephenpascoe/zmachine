@@ -43,9 +43,8 @@ dump :: RIO App ()
 dump = do
     dict          <- D.getDictionary
     header        <- M.getHeader
-    abbreviations <- A.getAbbreviationTable
     objects       <- OB.getObjects
 
     logInfo . display $ header
     logInfo . display $ dict
-  -- logInfo . display $ objects
+    logInfo . display $ objects

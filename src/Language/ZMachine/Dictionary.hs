@@ -17,6 +17,7 @@ import           RIO
 import           Data.Binary.Get
 import qualified RIO.ByteString                as B
 import qualified RIO.ByteString.Lazy           as BL
+import qualified RIO.Text                      as T
 
 import qualified Language.ZMachine.Memory      as M
 import qualified Language.ZMachine.ZSCII       as Z
@@ -84,7 +85,9 @@ decodeWordEntries v a h =
             zstr <- getByteString zlen
             skip $ entryLength h - zlen
             rest <- f (n + 1)
-            return $ Z.decodeZString v a (BL.fromStrict zstr) : rest
+            case Z.decodeZString v a (BL.fromStrict zstr) of
+              Left e -> fail $ T.unpack e
+              Right zscii -> return $ zscii : rest
     in  f 0
 
 

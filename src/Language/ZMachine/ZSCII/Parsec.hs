@@ -1,6 +1,5 @@
 module Language.ZMachine.ZSCII.Parsec
     ( decodeZString
-    , ZsciiException(..)
     )
 where
 
@@ -20,14 +19,11 @@ import           Language.ZMachine.ZSCII.ZChars
 import qualified Language.ZMachine.Memory      as M
 
 
-data ZsciiException = ZsciiException T.Text
-    deriving (Show, Typeable)
-instance Exception ZsciiException
-
 data Alphabet = Alpha0 | Alpha1 | Alpha2 deriving Eq
 
 type ZsciiParsec = Parsec [ZChar] Alphabet
 
+type ZsciiResult a = Either T.Text a
 
 
 getAlphabetTable :: M.ZVersion -> Alphabet -> B.ByteString
@@ -39,12 +35,11 @@ getAlphabetTable _       Alpha1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 getAlphabetTable _       Alpha2 = "^\n0123456789.,!?_#'\"/\\-:()"
 
 
--- TODO :: Convert to HasAbbreviations 
 decodeZString
     :: M.ZVersion                -- ^ ZMachine version
     -> Maybe AbbreviationTable   -- ^ Abbreviations, if available
     -> ZString                   -- ^ Input ZString
-    -> ZsciiString               -- ^ Resulting ZsciiString or error
+    -> ZsciiResult ZsciiString   -- ^ Resulting ZsciiString or error
 decodeZString version aTable zstr =
     zcharsToZscii version aTable (zstrToZchars zstr)
 
@@ -58,7 +53,7 @@ foldTokens toks = ZsciiString $ foldl' f "" toks  where
     f acc (AbrevToken (ZsciiString abrev)) = B.append acc abrev
     f acc (ZCharToken zchar              ) = B.snoc acc zchar
 
-zcharsToZscii :: M.ZVersion -> Maybe AbbreviationTable -> [ZChar] -> ZsciiString
+zcharsToZscii :: M.ZVersion -> Maybe AbbreviationTable -> [ZChar] -> ZsciiResult ZsciiString
 zcharsToZscii version aTable zchars =
     let
         parseZstring :: ZsciiParsec ZsciiString
@@ -167,18 +162,20 @@ zcharsToZscii version aTable zchars =
         abbrev :: ZChar -> ZsciiParsec Token
         abbrev x = do
             z <- anyChar
-            return $ getAbbreviation aTable x z
+            case getAbbreviation aTable x z of
+              Left e -> fail $ T.unpack e
+              Right tok -> return tok
     in
         case runParser parseZstring Alpha0 "ZString decoder" zchars of
-            Left  e     -> impureThrow $ ZsciiException (T.pack (show e))
-            Right zscii -> zscii
+            -- Left  e     -> Left $ T.pack (show e)
+            Left _ -> Right "-ERROR-"
+            Right zscii -> Right zscii
 
 
-getAbbreviation :: Maybe AbbreviationTable -> ZChar -> ZChar -> Token
+getAbbreviation :: Maybe AbbreviationTable -> ZChar -> ZChar -> ZsciiResult Token
 getAbbreviation Nothing _ _ =
-  -- impureThrow $ ZsciiException "No abbreviations available"
-    AbrevToken "-"
+    Left "No abbreviations available"
 
 getAbbreviation (Just t) a b = case t !? (((fromIntegral a - 1) * 32) + fromIntegral b) of
-    Nothing -> impureThrow $ ZsciiException ("Abbreviation index out of range : " <> (T.pack . show $ a) <> " " <> (T.pack . show $ b))
-    Just x  -> AbrevToken x
+    Nothing -> Left ("Abbreviation index out of range : " <> (T.pack . show $ a) <> " " <> (T.pack . show $ b))
+    Just x  -> Right $ AbrevToken x
