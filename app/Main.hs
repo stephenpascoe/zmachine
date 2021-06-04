@@ -2,50 +2,59 @@ module Main where
 
 import           RIO
 
-import           Language.ZMachine.App
+import Language.ZMachine.App
 import qualified Language.ZMachine.Memory      as M
 import qualified Language.ZMachine.Dictionary  as D
 import qualified Language.ZMachine.Object      as OB
-import qualified Language.ZMachine.Abbreviations
-                                               as A
-import           System.Environment             ( getArgs )
+import Options.Applicative
+import Data.Semigroup ((<>))
 
-import qualified RIO.List                      as L
-import qualified RIO.ByteString                as B
+
 import qualified RIO.ByteString.Lazy           as BL
 
 
-main :: IO ()
-main = do
-    runApp dump
-    return ()
 
--- TODO : refactor to aid debugging
+main :: IO ()
+main = fromMaybe () <$> runApp dump
+
+
 runApp :: RIO App a -> IO (Maybe a)
-runApp action = do
+runApp appAction = do
     logOptions' <- logOptionsHandle stdout False
 
-    withLogFunc logOptions' $ \logFunc -> do
-        args <- liftIO $ getArgs
-        let mStoryFile = L.headMaybe args
+    withLogFunc logOptions' $ \logFunc ->
+        let runWithOpts opts = do
+                file <- BL.readFile (storyPath opts)
+                let app = App { appLogger = logFunc
+                                , story = BL.toStrict file
+                                , appOptions = opts
+                              }
+                Just <$> runRIO app appAction
+        in
+            runWithOpts =<< execParser cmdParser
 
-        case mStoryFile of
-            Nothing -> do
-                B.putStr "No story file specified\n"
-                pure Nothing
-            Just storyPath -> do
-                file <- BL.readFile storyPath
-                let app = App { appLogger = logFunc, story = BL.toStrict file }
-                Just <$> runRIO app action
+appParser :: Parser AppOptions
+appParser = AppOptions
+    <$> argument str (metavar "STORY" <> help "Story file path")
+    <*> switch (long "dump-dict" <> short 'd' <> help "Dump dictionary")
+    <*> switch (long "dump-objects" <> short 'o' <> help "Dump objects")
+    <*> switch (long "dump-tree" <> short 't' <> help "Dump object tree")
 
+cmdParser :: ParserInfo AppOptions
+cmdParser = info (appParser <**> helper)
+    ( fullDesc
+    <> progDesc "ZMachine for Haskell"
+    )
 
 dump :: RIO App ()
 dump = do
+    opts <- appOptions <$> ask
     dict          <- D.getDictionary
-    header        <- M.getHeader
+    zHeader       <- M.getHeader
     objects       <- OB.getObjects
 
-    logInfo . display $ header
-    -- logInfo . display $ dict
-    -- logInfo . display $ objects
-    logInfo . OB.displayObjectTree $ OB.makeObjectTree objects
+    logInfo . display $ zHeader
+    if dumpDict opts then logInfo . display $ dict else pure ()
+    if dumpObjects opts then logInfo . display $ objects else pure ()
+    if dumpObjectTree opts then logInfo . OB.displayObjectTree $ OB.makeObjectTree objects else pure ()
+    return ()

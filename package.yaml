@@ -29,6 +29,7 @@ dependencies:
 - hspec
 - QuickCheck
 - quickcheck-instances
+- optparse-applicative
 #- mtl
 #- transformers
 - parsec
