@@ -14,8 +14,8 @@ import qualified RIO.ByteString                as B
 --
 
 data App = App
-    { appLogger :: !LogFunc
-    , story     :: !B.ByteString
+    { appLogger  :: !LogFunc
+    , story      :: !B.ByteString
     , appOptions :: !AppOptions
     }
 
@@ -23,8 +23,8 @@ instance HasLogFunc App where
     logFuncL = lens appLogger (\x y -> x { appLogger = y })
 
 data AppOptions = AppOptions
-    { storyPath :: String 
-    , dumpDict :: Bool 
-    , dumpObjects :: Bool 
+    { storyPath      :: String
+    , dumpDict       :: Bool
+    , dumpObjects    :: Bool
     , dumpObjectTree :: Bool
     }
